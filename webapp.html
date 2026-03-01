@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Select Date & Time</title>
+    <!-- Include Telegram WebApp JS library -->
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        :root {
+            --primary-bg: #fff5f5; /* Light pastel pink/beige background */
+            --text-color: #4a4a4a;
+            --text-muted: #888888;
+            --accent-color: #ffb6c1; /* Soft pink */
+            --accent-hover: #ff9cb0;
+            --card-bg: #ffffff;
+            --selected-bg: #ffb6c1;
+            --selected-text: #ffffff;
+            --border-radius: 16px;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            background-color: var(--primary-bg);
+            color: var(--text-color);
+            padding: 24px 20px;
+        }
+
+        h2 {
+            font-size: 26px;
+            font-weight: 700;
+            margin-bottom: 24px;
+            color: #333;
+            letter-spacing: -0.5px;
+        }
+
+        .section-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 14px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        /* --- Date Scroll Container --- */
+        .date-container {
+            display: flex;
+            overflow-x: auto;
+            gap: 12px;
+            padding-bottom: 15px; /* space for shadow */
+            margin-bottom: 20px;
+            -ms-overflow-style: none; /* IE and Edge */
+            scrollbar-width: none; /* Firefox */
+        }
+        
+        .date-container::-webkit-scrollbar {
+            display: none; /* Chrome, Safari and Opera */
+        }
+
+        .date-card {
+            min-width: 75px;
+            background-color: var(--card-bg);
+            border: 2px solid transparent;
+            border-radius: var(--border-radius);
+            padding: 16px 10px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.03);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .date-card.active {
+            background-color: var(--selected-bg);
+            color: var(--selected-text);
+            border-color: var(--selected-bg);
+            transform: translateY(-4px);
+            box-shadow: 0 8px 16px rgba(255, 182, 193, 0.4);
+        }
+
+        .date-day {
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            margin-bottom: 6px;
+            opacity: 0.9;
+        }
+
+        .date-num {
+            font-size: 24px;
+            font-weight: 700;
+            line-height: 1;
+        }
+
+        .date-month {
+            font-size: 11px;
+            font-weight: 500;
+            margin-top: 6px;
+            opacity: 0.8;
+            text-transform: uppercase;
+        }
+
+        /* --- Time Grid Container --- */
+        .time-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 14px;
+            margin-bottom: 36px;
+        }
+
+        .time-slot {
+            background-color: var(--card-bg);
+            border: 2px solid transparent;
+            border-radius: var(--border-radius);
+            padding: 16px 10px;
+            text-align: center;
+            font-size: 17px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.03);
+        }
+
+        .time-slot.active {
+            background-color: var(--selected-bg);
+            color: var(--selected-text);
+            border-color: var(--selected-bg);
+            transform: scale(1.03);
+            box-shadow: 0 8px 16px rgba(255, 182, 193, 0.4);
+        }
+
+        /* --- Confirm Button --- */
+        button.confirm-btn {
+            width: 100%;
+            background-color: var(--accent-color);
+            color: white;
+            border: none;
+            border-radius: var(--border-radius);
+            padding: 18px;
+            font-size: 18px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 6px 20px rgba(255, 182, 193, 0.5);
+            outline: none;
+        }
+
+        button.confirm-btn:active {
+            transform: scale(0.97);
+        }
+
+        button.confirm-btn:disabled {
+            background-color: #e6e6e6;
+            color: #a0a0a0;
+            box-shadow: none;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+    </style>
+</head>
+<body>
+
+    <h2>Select Date & Time</h2>
+    
+    <div class="section-title">Date</div>
+    <div class="date-container" id="date-container">
+        <!-- Dates will be populated dynamically by Javascript -->
+    </div>
+
+    <div class="section-title">Time</div>
+    <div class="time-grid" id="time-grid">
+        <!-- Times will be populated dynamically by Javascript -->
+    </div>
+
+    <!-- We keep a visible confirm button, although often Mini Apps use the native Telegram MainButton -->
+    <button id="confirm-btn" class="confirm-btn" disabled>Confirm</button>
+
+    <script>
+        // --- 1. Initialize Telegram Web App API ---
+        const tg = window.Telegram.WebApp;
+        tg.expand(); // Expands the widget to full height
+        tg.ready();  // Tells Telegram the app is fully loaded
+
+        // Inherit theme colors from Telegram (optional, but good for dark mode support if needed)
+        // Here we are sticking primarily to the requested pastel theme, but acknowledging Telegram's API.
+
+        // --- 2. State & Configuration ---
+        let selectedDate = null;
+        let selectedTime = null;
+
+        const timeSlots = ["10:00", "13:00", "16:00", "19:00"];
+        
+        const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+        const shortMonths = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+        const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+        // --- 3. DOM Elements ---
+        const dateContainer = document.getElementById('date-container');
+        const timeGrid = document.getElementById('time-grid');
+        const confirmBtn = document.getElementById('confirm-btn');
+
+        // --- 4. Logic Functions ---
+        
+        // Generate the next 7 days dynamically
+        function generateDates() {
+            const today = new Date();
+            for (let i = 0; i < 7; i++) {
+                const targetDate = new Date();
+                targetDate.setDate(today.getDate() + i);
+
+                const dDay = days[targetDate.getDay()];
+                const dMonth = shortMonths[targetDate.getMonth()];
+                const dNum = targetDate.getDate();
+                
+                // Formatted string to send back to bot, e.g., "March 5"
+                const dFull = `${months[targetDate.getMonth()]} ${dNum}`; 
+
+                const card = document.createElement('div');
+                card.className = 'date-card';
+                card.innerHTML = `
+                    <div class="date-day">${dDay}</div>
+                    <div class="date-num">${dNum}</div>
+                    <div class="date-month">${dMonth}</div>
+                `;
+                
+                card.onclick = () => selectDate(card, dFull);
+                dateContainer.appendChild(card);
+            }
+        }
+
+        // Generate the time grid
+        function generateTimes() {
+            timeSlots.forEach(time => {
+                const slot = document.createElement('div');
+                slot.className = 'time-slot';
+                slot.textContent = time;
+                
+                slot.onclick = () => selectTime(slot, time);
+                timeGrid.appendChild(slot);
+            });
+        }
+
+        // Handle Date Click
+        function selectDate(element, dateStr) {
+            document.querySelectorAll('.date-card').forEach(el => el.classList.remove('active'));
+            element.classList.add('active');
+            selectedDate = dateStr;
+            checkConfirmation();
+        }
+
+        // Handle Time Click
+        function selectTime(element, timeStr) {
+            document.querySelectorAll('.time-slot').forEach(el => el.classList.remove('active'));
+            element.classList.add('active');
+            selectedTime = timeStr;
+            checkConfirmation();
+        }
+
+        // Check if both Date and Time are selected to enable confirmation
+        function checkConfirmation() {
+            if (selectedDate && selectedTime) {
+                // Enable HTML Button
+                confirmBtn.disabled = false;
+                
+                // Also configure the native Telegram Main Button (Best Practice for Mini Apps)
+                if (tg.MainButton) {
+                    tg.MainButton.text = "CONFIRM BOOKING";
+                    tg.MainButton.color = "#ffb6c1"; // Match our pastel theme
+                    tg.MainButton.textColor = "#ffffff";
+                    tg.MainButton.show();
+                    // We need to ensure we don't bind multiple events
+                    tg.MainButton.offClick(submitData); 
+                    tg.MainButton.onClick(submitData);
+                }
+            } else {
+                confirmBtn.disabled = true;
+                if (tg.MainButton) {
+                    tg.MainButton.hide();
+                }
+            }
+        }
+
+        // Handle sending the data back to the Telegram Bot
+        function submitData() {
+            if (!selectedDate || !selectedTime) return;
+            
+            const data = {
+                date: selectedDate,
+                time: selectedTime
+            };
+            
+            // Send exactly the requested JSON format back to the bot
+            tg.sendData(JSON.stringify(data));
+        }
+
+        // Bind the HTML Button click
+        confirmBtn.addEventListener('click', submitData);
+
+        // --- 5. Initial Render ---
+        generateDates();
+        generateTimes();
+
+    </script>
+</body>
+</html>
