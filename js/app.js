@@ -27,7 +27,6 @@ const customOptionsContainer = document.getElementById('custom-options');
 const dateContainer = document.getElementById('date-container');
 const timeGrid = document.getElementById('time-grid');
 const phoneInput = document.getElementById('phone-input');
-const confirmBtn = document.getElementById('confirm-btn');
 
 // --- D.2 Modal Elements ---
 const modal = document.getElementById('confirm-modal');
@@ -143,8 +142,6 @@ function checkConfirmation() {
     const isPhoneValid = digitsOnly.length >= 10;
 
     if (selectedService && selectedDate && selectedTime && isPhoneValid) {
-        confirmBtn.disabled = false;
-
         if (tg.MainButton) {
             tg.MainButton.text = "ПОДТВЕРДИТЬ ЗАПИСЬ";
             tg.MainButton.color = config.themeColors.mainButtonColor;
@@ -155,7 +152,6 @@ function checkConfirmation() {
             tg.MainButton.onClick(showModal);
         }
     } else {
-        confirmBtn.disabled = true;
         if (tg.MainButton) tg.MainButton.hide();
     }
 }
@@ -202,7 +198,6 @@ function submitData() {
     tg.sendData(JSON.stringify(data));
 }
 
-confirmBtn.addEventListener('click', showModal);
 modalCancel.addEventListener('click', hideModal);
 modalSubmit.addEventListener('click', submitData);
 
