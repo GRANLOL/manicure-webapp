@@ -294,6 +294,7 @@ body {
     border-top: none;
     -ms-overflow-style: none;
     scrollbar-width: none;
+    will-change: transform, opacity;
 }
 
 .custom-options::-webkit-scrollbar {
@@ -360,6 +361,7 @@ body {
     position: relative;
     overflow: hidden;
     touch-action: manipulation;
+    will-change: transform, box-shadow;
 }
 
 .date-card::after {
@@ -432,6 +434,7 @@ body {
     position: relative;
     overflow: hidden;
     touch-action: manipulation;
+    will-change: transform, box-shadow;
 }
 
 .time-slot::after {
@@ -511,6 +514,7 @@ button.confirm-btn {
     position: relative;
     overflow: hidden;
     touch-action: manipulation;
+    will-change: transform, box-shadow;
 }
 
 button.confirm-btn::after {
