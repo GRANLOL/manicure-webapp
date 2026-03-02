@@ -353,6 +353,23 @@ body {
     box-shadow: var(--shadow-active-item);
 }
 
+.date-card.date-full {
+    opacity: 0.5;
+    cursor: not-allowed;
+    background-color: var(--card-bg);
+    color: var(--text-muted);
+    box-shadow: none;
+    border-color: transparent;
+}
+
+.date-card.date-full:active {
+    transform: none;
+}
+
+.date-card.date-full::after {
+    display: none;
+}
+
 .date-day {
     font-size: 11px;
     font-weight: 500;
@@ -424,6 +441,24 @@ body {
     border-color: var(--selected-bg);
     transform: scale(1.06) translateY(-3px);
     box-shadow: var(--shadow-active-item);
+}
+
+.time-slot.slot-busy {
+    opacity: 0.5;
+    cursor: not-allowed;
+    background-color: var(--card-bg);
+    color: var(--text-muted);
+    text-decoration: line-through;
+    box-shadow: none;
+    border-color: transparent;
+}
+
+.time-slot.slot-busy:active {
+    transform: none;
+}
+
+.time-slot.slot-busy::after {
+    display: none;
 }
 
 /* --- Text Inputs (Name & Phone) --- */
