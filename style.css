@@ -134,9 +134,10 @@ body {
 }
 
 /* --- Dynamic Header --- */
-.header-container {
-    padding: 16px 20px;
+.salon-header {
     background-color: rgba(250, 246, 245, 0.95);
+    padding: var(--padding-header);
+    margin: var(--margin-header);
     border-bottom: 1px solid var(--glass-border);
     position: sticky;
     top: 0;
@@ -148,6 +149,7 @@ body {
     min-height: 80px;
     border-radius: var(--border-radius);
     box-shadow: var(--shadow-heavy), var(--shadow-inset-header);
+    border: 1px solid var(--glass-border);
 }
 
 .salon-logo-placeholder {
@@ -315,7 +317,7 @@ body {
     text-align: center;
     cursor: pointer;
     transition: var(--transition-smooth);
-    box-shadow: none;
+    box-shadow: var(--shadow-medium);
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -324,7 +326,6 @@ body {
     touch-action: manipulation;
     will-change: transform, opacity;
     transform: translateZ(0);
-    contain: strict;
 }
 
 .fade-in {
@@ -368,7 +369,7 @@ body {
     color: var(--selected-text);
     border-color: var(--selected-bg);
     transform: translateY(-8px) scale(1.02);
-    box-shadow: var(--shadow-light);
+    box-shadow: var(--shadow-active-item);
 }
 
 .date-card.date-full {
@@ -426,13 +427,12 @@ body {
     font-weight: 600;
     cursor: pointer;
     transition: var(--transition-smooth);
-    box-shadow: none;
+    box-shadow: var(--shadow-medium);
     position: relative;
     overflow: hidden;
     touch-action: manipulation;
     will-change: transform, opacity;
     transform: translateZ(0);
-    contain: strict;
 }
 
 .time-slot::after {
@@ -460,7 +460,7 @@ body {
     color: var(--selected-text);
     border-color: var(--selected-bg);
     transform: scale(1.06) translateY(-3px);
-    box-shadow: var(--shadow-light);
+    box-shadow: var(--shadow-active-item);
 }
 
 .time-slot.slot-busy {
