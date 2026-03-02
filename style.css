@@ -74,6 +74,7 @@ body {
     justify-content: center;
     min-height: 100vh;
     position: relative;
+    -webkit-overflow-scrolling: touch;
 }
 
 /* --- Premium Static Background Layers --- */
@@ -129,6 +130,7 @@ body {
     padding-bottom: 30px;
     overflow-x: hidden;
     overflow-y: visible;
+    -webkit-overflow-scrolling: touch;
 }
 
 /* --- Dynamic Header --- */
@@ -548,7 +550,7 @@ body {
     border-radius: var(--border-radius-lg);
     padding: 32px 24px;
     box-shadow: var(--shadow-heavy);
-    transform: translateY(20px) scale(0.95) translateZ(0);
+    transform: scale(0.95) translateZ(0);
     transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
     text-align: center;
     border: 1px solid var(--glass-border);
@@ -556,7 +558,7 @@ body {
 }
 
 .modal-overlay.active .modal-card {
-    transform: translateY(0) scale(1) translateZ(0);
+    transform: scale(1) translateZ(0);
 }
 
 .modal-title {
@@ -667,7 +669,7 @@ body {
     border-radius: var(--border-radius-lg);
     box-shadow: var(--shadow-heavy);
     border: 1px solid var(--glass-border);
-    transform: translateY(20px) scale(0.95) translateZ(0);
+    transform: scale(0.95) translateZ(0);
     transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
     width: 90%;
     max-width: 360px;
@@ -675,7 +677,7 @@ body {
 }
 
 .success-screen.active .success-card {
-    transform: translateY(0) scale(1) translateZ(0);
+    transform: scale(1) translateZ(0);
 }
 
 .success-icon svg {
