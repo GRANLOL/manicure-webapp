@@ -98,7 +98,7 @@ function populateServices() {
             closeDropdown();
             selectedService = serviceObj.name;
             checkConfirmation();
-        });
+        }, { passive: true });
 
         customOptionsContainer.appendChild(optionDiv);
     });
