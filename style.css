@@ -135,7 +135,9 @@ body {
 
 /* --- Dynamic Header --- */
 .salon-header {
-    background-color: rgba(250, 246, 245, 0.95);
+    background-color: var(--glass-bg-header);
+    backdrop-filter: var(--blur-header);
+    -webkit-backdrop-filter: var(--blur-header);
     padding: var(--padding-header);
     margin: var(--margin-header);
     border-bottom: 1px solid var(--glass-border);
@@ -520,7 +522,9 @@ body {
 .modal-overlay {
     position: fixed;
     inset: 0;
-    background-color: rgba(0, 0, 0, 0.4);
+    background-color: rgba(0, 0, 0, 0.2);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
     z-index: 1000;
     display: flex;
     align-items: center;
@@ -540,7 +544,9 @@ body {
 }
 
 .modal-card {
-    background-color: rgba(255, 255, 255, 0.98);
+    background-color: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
     width: 90%;
     max-width: 360px;
     border-radius: var(--border-radius-lg);
@@ -638,7 +644,9 @@ body {
 .success-screen {
     position: fixed;
     inset: 0;
-    background-color: rgba(250, 246, 245, 0.98);
+    background-color: rgba(250, 246, 245, 0.95);
+    backdrop-filter: blur(15px);
+    -webkit-backdrop-filter: blur(15px);
     z-index: 2000;
     display: flex;
     align-items: center;
@@ -687,7 +695,7 @@ body {
     stroke-dashoffset: 166;
     transition: stroke-dashoffset 0.6s cubic-bezier(0.4, 0, 0.2, 1);
     will-change: stroke-dashoffset;
-    transform: translate3d(0, 0, 0);
+    transform: translateZ(0);
 }
 
 .success-check {
@@ -697,7 +705,7 @@ body {
     stroke-dashoffset: 48;
     transition: stroke-dashoffset 0.4s cubic-bezier(0.4, 0, 0.2, 1);
     will-change: stroke-dashoffset;
-    transform: translate3d(0, 0, 0);
+    transform: translateZ(0);
 }
 
 .success-screen.animate .success-circle {
