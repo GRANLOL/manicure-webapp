@@ -280,6 +280,7 @@ body {
     will-change: transform, opacity;
     backface-visibility: hidden;
     box-sizing: border-box;
+    border-radius: 14px;
 }
 
 .custom-options::-webkit-scrollbar {
