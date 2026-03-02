@@ -105,11 +105,13 @@ function toggleDropdown() {
     tg.HapticFeedback.impactOccurred('light');
     selectTrigger.classList.toggle('open');
     customOptionsContainer.classList.toggle('open');
+    document.getElementById('service-wrapper').classList.toggle('open');
 }
 
 function closeDropdown() {
     selectTrigger.classList.remove('open');
     customOptionsContainer.classList.remove('open');
+    document.getElementById('service-wrapper').classList.remove('open');
 }
 
 const closeDropdownListener = (e) => {
