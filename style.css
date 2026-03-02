@@ -226,7 +226,7 @@ body {
     font-size: 16px;
     font-weight: 500;
     letter-spacing: 0.3px;
-    color: var(--text-muted);
+    color: var(--text-color);
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -235,13 +235,11 @@ body {
     box-sizing: border-box;
     width: 100%;
     background-color: transparent;
-    /* Wrapper handles background */
     border-radius: var(--border-radius);
     transition: var(--transition-smooth);
 }
 
 .custom-select-trigger.selected {
-    color: var(--text-color);
     font-weight: 600;
 }
 
@@ -259,36 +257,13 @@ body {
 }
 
 .custom-options {
-    position: absolute;
-    /* Start exactly where the trigger text ends, but layer it smoothly */
-    top: 100%;
-    left: -1px;
-    /* Align with wrapper border */
-    right: -1px;
-    width: calc(100% + 2px);
-    background-color: var(--card-bg);
-    /* The options list is the bottom half of the monolith */
-    border-radius: 0 0 var(--border-radius) var(--border-radius);
-    /* Soft top inset line to differentiate trigger from options */
-    box-shadow: inset 0 1px 0 var(--glass-border-logo), var(--shadow-heavy);
-    margin-top: 0;
-    opacity: 0;
-    visibility: hidden;
-    transform-origin: top;
-    transform: scaleY(0.95) translateY(-5px) translateZ(0);
-    /* Subtle slide down */
-    transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275),
-        opacity 0.2s ease-out,
-        visibility 0.3s ease-out;
-    max-height: 220px;
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
-    border: 1px solid var(--accent-color);
-    border-top: none;
-    -ms-overflow-style: none;
-    scrollbar-width: none;
-    will-change: transform, opacity;
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    background-color: transparent;
     box-sizing: border-box;
+    width: 100%;
+    will-change: max-height;
 }
 
 .custom-options::-webkit-scrollbar {
@@ -296,22 +271,31 @@ body {
 }
 
 .custom-options.open {
-    opacity: 1;
-    visibility: visible;
-    transform: scaleY(1) translateY(0) translateZ(0);
+    max-height: 400px;
+    /* High enough to fit all content */
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
 }
 
 .custom-option {
     padding: var(--padding-option);
     font-size: 15px;
-    font-weight: 500;
     color: var(--text-color);
     cursor: pointer;
-    border-bottom: 1px solid var(--glass-border-logo);
+    border-top: 1px solid var(--glass-border-logo);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
 }
 
-.custom-option:last-child {
-    border-bottom: none;
+.service-name {
+    font-weight: 500;
+}
+
+.service-price {
+    font-weight: 600;
+    color: var(--accent-color);
+    font-size: 14px;
 }
 
 .custom-option:active {
