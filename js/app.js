@@ -79,21 +79,24 @@ const successTime = document.getElementById('success-time');
 
 // Custom Dropdown Logic
 function populateServices() {
-    config.services.forEach(service => {
+    config.services.forEach(serviceObj => {
         const optionDiv = document.createElement('div');
         optionDiv.className = 'custom-option';
-        optionDiv.textContent = service;
+        optionDiv.innerHTML = `
+            <span class="service-name">${serviceObj.name}</span>
+            <span class="service-price">${serviceObj.price}</span>
+        `;
 
         optionDiv.addEventListener('click', () => {
             tg.HapticFeedback.impactOccurred('light');
-            selectLabel.textContent = service;
+            selectLabel.textContent = serviceObj.name;
             selectTrigger.classList.add('selected');
 
             document.querySelectorAll('.custom-option').forEach(opt => opt.classList.remove('selected'));
             optionDiv.classList.add('selected');
 
             closeDropdown();
-            selectedService = service;
+            selectedService = serviceObj.name;
             checkConfirmation();
         });
 
