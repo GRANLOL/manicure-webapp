@@ -218,6 +218,8 @@ body {
     transition: var(--transition-smooth);
     border: 1px solid var(--glass-border-logo);
     touch-action: manipulation;
+    box-sizing: border-box;
+    width: 100%;
 }
 
 .custom-select-trigger.selected {
@@ -255,15 +257,19 @@ body {
     margin-top: -1px;
     opacity: 0;
     visibility: hidden;
-    transform: translateY(-10px);
-    transition: var(--transition-smooth);
+    transform-origin: top;
+    transform: scaleY(0) translateZ(0);
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1), visibility 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     max-height: 220px;
     overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
     border: 1px solid var(--glass-border-logo);
     border-top: none;
     -ms-overflow-style: none;
     scrollbar-width: none;
     will-change: transform, opacity;
+    box-sizing: border-box;
+    width: 100%;
 }
 
 .custom-options::-webkit-scrollbar {
@@ -273,7 +279,7 @@ body {
 .custom-options.open {
     opacity: 1;
     visibility: visible;
-    transform: translateY(0);
+    transform: scaleY(1) translateZ(0);
 }
 
 .custom-option {
