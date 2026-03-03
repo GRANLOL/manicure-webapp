@@ -17,6 +17,7 @@ let selectedDate = null;
 let selectedTime = null;
 let busySlots = {};
 let dynamicServices = [];
+let dynamicCategories = [];
 let dynamicTimeSlots = [];
 let dynamicBookingWindow = 7;
 let workingDays = [1, 2, 3, 4, 5, 6, 0];
@@ -68,6 +69,9 @@ async function fetchContent() {
         const data = await response.json();
         if (data.services && data.time_slots) {
             dynamicServices = data.services;
+            if (data.categories) {
+                dynamicCategories = data.categories;
+            }
             dynamicTimeSlots = data.time_slots.map(ts => ts.time_value);
             if (data.booking_window) {
                 dynamicBookingWindow = data.booking_window;
@@ -91,6 +95,7 @@ async function fetchContent() {
 }
 
 // --- D. DOM Elements ---
+const categoryTabsContainer = document.getElementById('category-tabs-container');
 const selectTrigger = document.getElementById('select-trigger');
 const selectLabel = document.getElementById('select-label');
 const customOptionsContainer = document.getElementById('custom-options');
@@ -117,10 +122,58 @@ const successTime = document.getElementById('success-time');
 
 // --- E. Generation Functions ---
 
+function renderCategories() {
+    if (!dynamicCategories || dynamicCategories.length === 0) {
+        categoryTabsContainer.style.display = 'none';
+        return;
+    }
+
+    categoryTabsContainer.style.display = 'flex';
+    categoryTabsContainer.innerHTML = '';
+
+    const allChip = document.createElement('div');
+    allChip.className = 'category-chip active';
+    allChip.textContent = 'Все услуги';
+    allChip.onclick = () => selectCategory(null, allChip);
+    categoryTabsContainer.appendChild(allChip);
+
+    dynamicCategories.forEach(cat => {
+        const chip = document.createElement('div');
+        chip.className = 'category-chip';
+        chip.textContent = cat.name;
+        chip.onclick = () => selectCategory(cat.id, chip);
+        categoryTabsContainer.appendChild(chip);
+    });
+}
+
+function selectCategory(categoryId, activeElement) {
+    tg.HapticFeedback.impactOccurred('light');
+    document.querySelectorAll('.category-chip').forEach(el => el.classList.remove('active'));
+    activeElement.classList.add('active');
+
+    selectLabel.textContent = 'Выберите услугу...';
+    selectTrigger.classList.remove('selected');
+    selectedService = null;
+    checkConfirmation();
+
+    populateServices(categoryId);
+}
+
 // Custom Dropdown Logic
-function populateServices() {
+function populateServices(categoryId = null) {
     customOptionsContainer.innerHTML = ''; // Clear skeleton before re-rendering
-    dynamicServices.forEach(serviceObj => {
+
+    let filteredServices = dynamicServices;
+    if (categoryId !== null) {
+        filteredServices = dynamicServices.filter(s => s.category_id === categoryId);
+    }
+
+    if (filteredServices.length === 0) {
+        customOptionsContainer.innerHTML = '<div class="custom-option"><span class="service-name" style="color:#909090;">Нет услуг в этой категории</span></div>';
+        return;
+    }
+
+    filteredServices.forEach(serviceObj => {
         const optionDiv = document.createElement('div');
         optionDiv.className = 'custom-option';
         optionDiv.innerHTML = `
@@ -412,6 +465,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     await fetchContent();
+    renderCategories();
     await fetchBusySlots();
     populateServices();
     generateDates();
