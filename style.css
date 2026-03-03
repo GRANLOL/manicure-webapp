@@ -6,6 +6,7 @@
     --body-bg: #EAE0DE;
     --text-color: #2D2D2D;
     --text-muted: #8E8A86;
+    --text-secondary: #8E8A86;
     --accent-color: #E2B6B3;
     --accent-hover: #D5A09C;
     --card-bg: #FFFFFF;
@@ -420,6 +421,8 @@ body {
     overflow: hidden;
     transition: max-height 0.35s cubic-bezier(0.4, 0, 0.2, 1);
     will-change: max-height;
+    transform: translateZ(0);
+    backface-visibility: hidden;
 }
 
 .cat-group.open>.cat-body {
