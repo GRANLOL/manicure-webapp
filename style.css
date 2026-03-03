@@ -382,6 +382,14 @@ body {
     scroll-snap-align: start;
 }
 
+.date-off {
+    background-color: var(--glass-bg-app);
+    color: #909090;
+    border-color: transparent;
+    pointer-events: none;
+    opacity: 0.65;
+}
+
 .fade-in {
     animation: fadeInSmooth 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards;
 }
