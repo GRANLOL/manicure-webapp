@@ -172,26 +172,12 @@ function selectCategory(categoryId, activeElement) {
 }
 
 // Custom Dropdown Logic
+let _currentCategoryId = null; // track active category for search filtering
+
 function populateServices(categoryId = null, searchQuery = '') {
-    customOptionsContainer.innerHTML = '';
-
-    // Re-inject search input
-    const searchDiv = document.createElement('div');
-    searchDiv.className = 'search-container';
-    searchDiv.innerHTML = `<input type="text" id="search-input" class="search-input" placeholder="Поиск услуг..." autocomplete="off" value="${searchQuery}">`;
-    customOptionsContainer.appendChild(searchDiv);
-
-    const searchInput = document.getElementById('search-input');
-    // Prevent closing when typing
-    searchDiv.addEventListener('click', (e) => e.stopPropagation());
-    searchInput.addEventListener('input', (e) => {
-        populateServices(categoryId, e.target.value);
-        // keep focus
-        const newSearchInput = document.getElementById('search-input');
-        newSearchInput.focus();
-        // position cursor at end
-        newSearchInput.setSelectionRange(e.target.value.length, e.target.value.length);
-    });
+    _currentCategoryId = categoryId;
+    const resultsContainer = document.getElementById('service-results');
+    resultsContainer.innerHTML = '';
 
     let filteredServices = dynamicServices;
     if (categoryId !== null) {
@@ -207,7 +193,7 @@ function populateServices(categoryId = null, searchQuery = '') {
         const notFoundDiv = document.createElement('div');
         notFoundDiv.className = 'custom-option';
         notFoundDiv.innerHTML = '<span class="service-name" style="color:#909090;">Нет услуг по вашему запросу</span>';
-        customOptionsContainer.appendChild(notFoundDiv);
+        resultsContainer.appendChild(notFoundDiv);
         return;
     }
 
@@ -251,9 +237,22 @@ function populateServices(categoryId = null, searchQuery = '') {
             checkConfirmation();
         }, { passive: true });
 
-        customOptionsContainer.appendChild(optionDiv);
+        resultsContainer.appendChild(optionDiv);
     });
 }
+
+// --- Search listener (bound ONCE, never destroyed) ---
+(function initSearchListener() {
+    const searchInput = document.getElementById('search-input');
+    const searchContainer = document.getElementById('search-container');
+    if (searchInput) {
+        // Prevent dropdown close when interacting with search
+        searchContainer.addEventListener('click', (e) => e.stopPropagation());
+        searchInput.addEventListener('input', (e) => {
+            populateServices(_currentCategoryId, e.target.value);
+        });
+    }
+})();
 
 function toggleDropdown() {
     tg.HapticFeedback.impactOccurred('light');
@@ -267,7 +266,10 @@ function closeDropdown() {
     customOptionsContainer.classList.remove('open');
     document.getElementById('service-wrapper').classList.remove('open');
     const searchInput = document.getElementById('search-input');
-    if (searchInput) searchInput.blur();
+    if (searchInput) {
+        searchInput.value = '';
+        searchInput.blur();
+    }
 }
 
 function populateMasters() {
