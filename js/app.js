@@ -16,6 +16,8 @@ let selectedService = null;
 let selectedDate = null;
 let selectedTime = null;
 let busySlots = {};
+let dynamicServices = [];
+let dynamicTimeSlots = [];
 
 const months = ["Января", "Февраля", "Марта", "Апреля", "Мая", "Июня", "Июля", "Августа", "Сентября", "Октября", "Ноября", "Декабря"];
 const shortMonths = ["Янв", "Фев", "Мар", "Апр", "Май", "Июн", "Июл", "Авг", "Сен", "Окт", "Ноя", "Дек"];
@@ -50,6 +52,29 @@ async function fetchBusySlots() {
     }
 }
 
+async function fetchContent() {
+    try {
+        const response = await fetch('https://miki-suffruticose-restrainedly.ngrok-free.dev/api/get-content', {
+            headers: {
+                'ngrok-skip-browser-warning': 'true',
+                'Content-Type': 'application/json'
+            }
+        });
+        if (!response.ok) throw new Error('Server returned ' + response.status);
+
+        const data = await response.json();
+        if (data.services && data.time_slots) {
+            dynamicServices = data.services;
+            dynamicTimeSlots = data.time_slots.map(ts => ts.time_value);
+        }
+    } catch (e) {
+        console.error("Error fetching available content:", e);
+        // Fallbacks back to config if API fails completely to ensure app still loads somewhat
+        dynamicServices = config.services;
+        dynamicTimeSlots = config.timeSlots;
+    }
+}
+
 // --- D. DOM Elements ---
 const selectTrigger = document.getElementById('select-trigger');
 const selectLabel = document.getElementById('select-label');
@@ -79,7 +104,8 @@ const successTime = document.getElementById('success-time');
 
 // Custom Dropdown Logic
 function populateServices() {
-    config.services.forEach(serviceObj => {
+    customOptionsContainer.innerHTML = ''; // Clear skeleton before re-rendering
+    dynamicServices.forEach(serviceObj => {
         const optionDiv = document.createElement('div');
         optionDiv.className = 'custom-option';
         optionDiv.innerHTML = `
@@ -154,7 +180,7 @@ function generateDates() {
             <div class="date-month">${dMonth}</div>
         `;
 
-        if (busySlots[formattedDate] && busySlots[formattedDate].length >= config.timeSlots.length) {
+        if (busySlots[formattedDate] && busySlots[formattedDate].length >= dynamicTimeSlots.length) {
             card.classList.add('date-full');
         } else {
             card.onclick = () => selectDate(card, dFull, formattedDate);
@@ -169,7 +195,7 @@ function generateTimes(formattedDate = null) {
     timeGrid.innerHTML = '';
     const busyTimes = formattedDate && busySlots[formattedDate] ? busySlots[formattedDate] : [];
 
-    config.timeSlots.forEach(time => {
+    dynamicTimeSlots.forEach(time => {
         const slot = document.createElement('div');
         slot.className = 'time-slot fade-in';
         slot.textContent = time;
@@ -349,6 +375,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         nameInput.value = tg.initDataUnsafe.user.first_name || '';
     }
 
+    await fetchContent();
     await fetchBusySlots();
     populateServices();
     generateDates();
