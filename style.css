@@ -335,23 +335,32 @@ body {
     font-weight: 600;
 }
 
-/* --- Date Container (7 Days Compact View) --- */
+/* --- Date Container (Dynamic Horizontal Scroll) --- */
 .date-container {
     display: flex;
-    justify-content: space-between;
-    overflow: visible;
-    gap: 6px;
+    justify-content: flex-start;
+    overflow-x: auto;
+    overflow-y: visible;
+    gap: 8px;
     padding-bottom: 24px;
     padding-top: 12px;
     margin-top: -12px;
     margin-bottom: 12px;
     width: 100%;
     content-visibility: auto;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    touch-action: pan-x;
+}
+
+.date-container::-webkit-scrollbar {
+    display: none;
 }
 
 .date-card {
-    flex: 1;
-    min-width: 0;
+    flex: 0 0 auto;
+    min-width: 65px;
     background-color: var(--card-bg);
     border: 2px solid transparent;
     border-radius: var(--border-radius-sm);
@@ -370,6 +379,7 @@ body {
     transform: translateZ(0);
     backface-visibility: hidden;
     perspective: 1000px;
+    scroll-snap-align: start;
 }
 
 .fade-in {
