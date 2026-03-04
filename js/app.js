@@ -243,7 +243,26 @@ function populateServices(searchQuery = '') {
         header.addEventListener('click', (e) => {
             if (!isRoot) e.stopPropagation();
             if (window.tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
-            group.classList.toggle('open');
+
+            const isOpen = group.classList.contains('open');
+
+            if (isOpen) {
+                // Closing: pin current pixel height, then animate to 0
+                body.style.height = body.scrollHeight + 'px';
+                requestAnimationFrame(() => {
+                    body.style.height = '0px';
+                });
+                group.classList.remove('open');
+            } else {
+                // Opening: animate from 0 to exact content height
+                const targetH = inner.scrollHeight;
+                body.style.height = targetH + 'px';
+                group.classList.add('open');
+                // After transition ends, set to 'auto' so resizing works
+                body.addEventListener('transitionend', () => {
+                    if (group.classList.contains('open')) body.style.height = 'auto';
+                }, { once: true });
+            }
         });
 
         group.appendChild(header);
