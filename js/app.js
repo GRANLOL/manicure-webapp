@@ -254,11 +254,23 @@ function populateServices(searchQuery = '') {
                 });
                 group.classList.remove('open');
             } else {
-                // Opening: animate from 0 to exact content height
-                const targetH = inner.scrollHeight;
+                // Measure real content height cross-browser:
+                // Temporarily unlock height so the browser lays out the content
+                const prevHeight = body.style.height;
+                body.style.height = 'auto';
+                body.style.overflow = 'visible';
+                const targetH = body.scrollHeight;
+                body.style.overflow = '';
+                body.style.height = prevHeight || '0px';
+
+                // Force a reflow so the browser registers the 0px before animating
+                body.offsetHeight; // eslint-disable-line no-unused-expressions
+
+                // Animate to measured height
                 body.style.height = targetH + 'px';
                 group.classList.add('open');
-                // After transition ends, set to 'auto' so resizing works
+
+                // After transition, set 'auto' so nested items can expand freely
                 body.addEventListener('transitionend', () => {
                     if (group.classList.contains('open')) body.style.height = 'auto';
                 }, { once: true });
