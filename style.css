@@ -426,25 +426,46 @@ body {
 }
 
 .cat-group.open>.cat-body {
-    max-height: 600px;
+    max-height: 4000px;
+    padding-bottom: 4px;
 }
 
 .subcat-group.open>.subcat-body {
-    max-height: 400px;
+    max-height: 4000px;
+    padding-bottom: 4px;
 }
 
-/* Indent nested levels */
-.cat-body>.subcat-group>.subcat-header {
+/* Indent nested levels infinitely via structural selectors */
+.cat-body .subcat-header {
     padding-left: 32px;
 }
 
-.cat-body>.custom-option,
-.subcat-body>.custom-option {
+.cat-body .custom-option {
     padding-left: 32px;
 }
 
-.subcat-body>.custom-option {
+.subcat-body .subcat-header {
     padding-left: 46px;
+}
+
+.subcat-body .custom-option {
+    padding-left: 46px;
+}
+
+.subcat-body .subcat-body .subcat-header {
+    padding-left: 60px;
+}
+
+.subcat-body .subcat-body .custom-option {
+    padding-left: 60px;
+}
+
+.subcat-body .subcat-body .subcat-body .subcat-header {
+    padding-left: 74px;
+}
+
+.subcat-body .subcat-body .subcat-body .custom-option {
+    padding-left: 74px;
 }
 
 /* Divider for uncategorized section */
