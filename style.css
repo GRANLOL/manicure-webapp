@@ -458,24 +458,14 @@ body {
     transform: rotate(90deg);
 }
 
-/* --- Collapsible Bodies (grid animation — lag-free on all browsers) --- */
+/* --- Collapsible Bodies (JS drives explicit pixel heights for smooth animation) --- */
 .cat-body,
 .subcat-body {
-    display: grid;
-    grid-template-rows: 0fr;
-    transition: grid-template-rows 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.cat-group.open>.cat-body,
-.subcat-group.open>.subcat-body {
-    grid-template-rows: 1fr;
-}
-
-/* Inner wrapper — required for grid animation, clips the overflow */
-.body-inner {
+    height: 0;
     overflow: hidden;
-    min-height: 0;
+    transition: height 0.28s cubic-bezier(0.4, 0, 0.2, 1);
 }
+
 
 /* --- Service Items Inside Tree --- */
 .cat-body>.body-inner>.custom-option {
