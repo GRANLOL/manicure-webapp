@@ -323,15 +323,14 @@ body {
 }
 
 .custom-option {
-    padding: var(--padding-option);
-    font-size: 15px;
+    padding: 12px 18px;
+    font-size: 14px;
     color: var(--text-color);
     cursor: pointer;
     display: flex;
-    justify-content: space-between;
-    align-items: center;
+    align-items: baseline;
+    gap: 10px;
     border-bottom: 1px solid rgba(0, 0, 0, 0.05);
-    /* Very faint solid divider replacing blur/shadow */
 }
 
 .custom-option:last-child {
@@ -339,13 +338,19 @@ body {
 }
 
 .service-name {
+    font-size: 14px;
     font-weight: 500;
+    flex: 1;
+    min-width: 0;
+    line-height: 1.4;
 }
 
 .service-price {
+    font-size: 13px;
     font-weight: 600;
     color: var(--accent-color);
-    font-size: 14px;
+    white-space: nowrap;
+    flex-shrink: 0;
 }
 
 .custom-option:active {
