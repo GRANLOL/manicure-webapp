@@ -38,12 +38,7 @@ export function generateDates() {
                 <div class="date-num">${dNum}</div>
                 <div class="date-month">${dMonth}</div>
             `;
-
-            if (store.busySlots[formattedDate] && store.busySlots[formattedDate].length >= store.dynamicTimeSlots.length) {
-                card.classList.add('date-full');
-            } else {
-                card.onclick = () => selectDate(card, dFull, formattedDate);
-            }
+            card.onclick = () => selectDate(card, dFull, formattedDate);
         }
 
         dateContainer.appendChild(card);
@@ -53,21 +48,49 @@ export function generateDates() {
 export function generateTimes(formattedDate = null) {
     const timeGrid = document.getElementById('time-grid');
     timeGrid.innerHTML = '';
-    const busyTimes = formattedDate && store.busySlots[formattedDate] ? store.busySlots[formattedDate] : [];
+    const busyArr = formattedDate && store.busySlots[formattedDate] ? store.busySlots[formattedDate] : [];
 
-    store.dynamicTimeSlots.forEach(time => {
+    const [startStr, endStr] = store.workingHours.split('-');
+    const [startH, startM] = startStr.split(':').map(Number);
+    const [endH, endM] = endStr.split(':').map(Number);
+
+    const startMins = startH * 60 + startM;
+    const endMins = endH * 60 + endM;
+    const interval = store.scheduleInterval || 30;
+    const serviceDur = store.selectedDuration || 60;
+
+    for (let m = startMins; m + serviceDur <= endMins; m += interval) {
+        const h = Math.floor(m / 60).toString().padStart(2, '0');
+        const min = (m % 60).toString().padStart(2, '0');
+        const timeStr = `${h}:${min}`;
+
+        const slotStart = m;
+        const slotEnd = m + serviceDur;
+
+        let isBusy = false;
+        for (const busy of busyArr) {
+            const [bH, bM] = busy.time.split(':').map(Number);
+            const bStart = bH * 60 + bM;
+            const bEnd = bStart + (busy.duration || 60);
+
+            if (slotStart < bEnd && slotEnd > bStart) {
+                isBusy = true;
+                break;
+            }
+        }
+
         const slot = document.createElement('div');
         slot.className = 'time-slot fade-in';
-        slot.textContent = time;
+        slot.textContent = timeStr;
 
-        if (busyTimes.includes(time)) {
+        if (isBusy) {
             slot.classList.add('slot-busy');
         } else {
-            slot.onclick = () => selectTime(slot, time);
+            slot.onclick = () => selectTime(slot, timeStr);
         }
 
         timeGrid.appendChild(slot);
-    });
+    }
 }
 
 export function selectDate(element, dFull, formattedDate) {

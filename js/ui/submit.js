@@ -23,6 +23,7 @@ export function submitData() {
         service: store.selectedService,
         date: store.selectedDate,
         time: store.selectedTime,
+        duration: store.selectedDuration || 60,
         phone: phoneInput.value,
         name: nameInput.value.trim()
     };

@@ -43,6 +43,14 @@ async def init_db():
             await db.execute("ALTER TABLE bookings ADD COLUMN reminder_level INTEGER DEFAULT 0")
         except aiosqlite.OperationalError:
             pass
+        try:
+            await db.execute("ALTER TABLE services ADD COLUMN duration INTEGER DEFAULT 60")
+        except aiosqlite.OperationalError:
+            pass
+        try:
+            await db.execute("ALTER TABLE bookings ADD COLUMN duration INTEGER DEFAULT 60")
+        except aiosqlite.OperationalError:
+            pass
         await db.execute("""
             CREATE TABLE IF NOT EXISTS time_slots (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -59,11 +67,11 @@ async def init_db():
         """)
         await db.commit()
 
-async def add_booking(user_id, name, phone, date, time, master_id=None):
+async def add_booking(user_id, name, phone, date, time, master_id=None, duration=60):
     async with aiosqlite.connect("bookings.db") as db:
         await db.execute(
-            "INSERT INTO bookings (user_id, name, phone, date, time, master_id) VALUES (?, ?, ?, ?, ?, ?)",
-            (user_id, name, phone, date, time, master_id)
+            "INSERT INTO bookings (user_id, name, phone, date, time, master_id, duration) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (user_id, name, phone, date, time, master_id, duration)
         )
         await db.commit()
 
@@ -233,15 +241,18 @@ async def get_all_busy_slots(master_id: int | None = None):
     from collections import defaultdict
     async with aiosqlite.connect("bookings.db") as db:
         if master_id is not None:
-            async with db.execute("SELECT date, time FROM bookings WHERE master_id = ?", (master_id,)) as cursor:
+            async with db.execute("SELECT date, time, duration FROM bookings WHERE master_id = ?", (master_id,)) as cursor:
                 rows = await cursor.fetchall()
         else:
-            async with db.execute("SELECT date, time FROM bookings") as cursor:
+            async with db.execute("SELECT date, time, duration FROM bookings") as cursor:
                 rows = await cursor.fetchall()
         busy_slots = defaultdict(list)
         if rows:
-            for date, time in rows:
-                busy_slots[date].append(time)
+            for r in rows:
+                date = r[0]
+                time_str = r[1]
+                duration = r[2] if len(r) > 2 and r[2] is not None else 60
+                busy_slots[date].append({"time": time_str, "duration": duration})
         return dict(busy_slots)
 
 # --- CRUD for Masters ---
@@ -270,9 +281,9 @@ async def get_master_by_telegram_id(telegram_id: str):
             return None
 
 # --- CRUD for Services ---
-async def add_service(name: str, price: str, description: str = "", category_id: int | None = None):
+async def add_service(name: str, price: str, duration: int = 60, description: str = "", category_id: int | None = None):
     async with aiosqlite.connect("bookings.db") as db:
-        await db.execute("INSERT INTO services (name, price, description, category_id) VALUES (?, ?, ?, ?)", (name, price, description, category_id))
+        await db.execute("INSERT INTO services (name, price, duration, description, category_id) VALUES (?, ?, ?, ?, ?)", (name, price, duration, description, category_id))
         await db.commit()
 
 async def update_service_category(service_id: int, category_id: int | None):
@@ -293,25 +304,25 @@ async def update_service_price(service_id: int, price: str):
 async def get_service_by_id(service_id: int):
     async with aiosqlite.connect("bookings.db") as db:
         async with db.execute("""
-            SELECT s.id, s.name, s.price, s.description, s.category_id, c.name
+            SELECT s.id, s.name, s.price, s.duration, s.description, s.category_id, c.name
             FROM services s
             LEFT JOIN categories c ON s.category_id = c.id
             WHERE s.id = ?
         """, (service_id,)) as cursor:
             r = await cursor.fetchone()
             if r:
-                return {"id": r[0], "name": r[1], "price": r[2], "description": r[3], "category_id": r[4], "category_name": r[5]}
+                return {"id": r[0], "name": r[1], "price": r[2], "duration": r[3], "description": r[4], "category_id": r[5], "category_name": r[6]}
             return None
 
 async def get_all_services():
     async with aiosqlite.connect("bookings.db") as db:
         async with db.execute("""
-            SELECT s.id, s.name, s.price, s.description, s.category_id, c.name
+            SELECT s.id, s.name, s.price, s.duration, s.description, s.category_id, c.name
             FROM services s
             LEFT JOIN categories c ON s.category_id = c.id
         """) as cursor:
             rows = await cursor.fetchall()
-            return [{"id": r[0], "name": r[1], "price": r[2], "description": r[3], "category_id": r[4], "category_name": r[5]} for r in rows]
+            return [{"id": r[0], "name": r[1], "price": r[2], "duration": r[3], "description": r[4], "category_id": r[5], "category_name": r[6]} for r in rows]
 
 async def delete_service(service_id: int):
     async with aiosqlite.connect("bookings.db") as db:

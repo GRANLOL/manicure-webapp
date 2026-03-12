@@ -442,6 +442,7 @@ async def process_web_app_data(message: types.Message, state: FSMContext):
         service = data.get('service')
         date = data.get('date')
         time = data.get('time')
+        duration = data.get('duration', 60)
         phone = data.get('phone')
         name = data.get('name')
         
@@ -477,7 +478,8 @@ async def process_web_app_data(message: types.Message, state: FSMContext):
             phone=phone,
             date=date,
             time=time,
-            master_id=master_id
+            master_id=master_id,
+            duration=duration
         )
         
         # ОЧИЩАЕ МЕНЮ ОТ GHOST KEYBOARD И ПОДТВЕРЖДЕНИЕ ПОЛЬЗОВАТЕЛЮ
@@ -652,6 +654,7 @@ class AddServiceForm(StatesGroup):
     category_id = State()
     name = State()
     price = State()
+    duration = State()
 
 class CategoryWizard(StatesGroup):
     main_name = State()
@@ -661,6 +664,7 @@ class WizardAddServiceForm(StatesGroup):
     target_id = State()
     name = State()
     price = State()
+    duration = State()
 
 class EditServiceForm(StatesGroup):
     service_id = State()
@@ -682,8 +686,11 @@ class AddMasterForm(StatesGroup):
     telegram_id = State()
     category_id = State()
 
-class AddTimeSlotForm(StatesGroup):
-    time_value = State()
+class WorkingHoursForm(StatesGroup):
+    hours = State()
+
+class ScheduleIntervalForm(StatesGroup):
+    interval = State()
 
 class AddBookingWindowForm(StatesGroup):
     days = State()
@@ -965,49 +972,44 @@ async def process_booking_window(message: types.Message, state: FSMContext):
     await state.clear()
     await message.answer(f"✅ Окно бронирования успешно изменено на {days} дн.")
 
-@router.message(F.text == "🕒 Время")
-async def manage_time_slots_handler(message: types.Message):
+@router.callback_query(F.data == "settings_working_hours")
+async def settings_working_hours_cb(callback: types.CallbackQuery, state: FSMContext):
     admin_id = getenv("ADMIN_ID")
-    if not admin_id or str(message.from_user.id) != admin_id:
-        return
-        
-    slots = await database.get_all_time_slots()
-    await message.answer("Управление временем (доступные слоты):", reply_markup=keyboards.get_time_slots_keyboard(slots))
+    if not admin_id or str(callback.from_user.id) != admin_id: return
+    current_wh = salon_config.get("working_hours", "10:00-20:00")
+    await state.set_state(WorkingHoursForm.hours)
+    await callback.message.edit_text(f"Текущие рабочие часы: {current_wh}\nВведите новые рабочие часы в формате ЧЧ:ММ-ЧЧ:ММ (например, 10:00-20:00):", reply_markup=keyboards.get_cancel_admin_action_keyboard())
 
-@router.callback_query(F.data.startswith("del_ts_"))
-async def del_time_slot_callback(callback: types.CallbackQuery):
-    admin_id = getenv("ADMIN_ID")
-    if not admin_id or str(callback.from_user.id) != admin_id:
-        return
-    ts_id = int(callback.data.split("_")[2])
-    await database.delete_time_slot(ts_id)
-    slots = await database.get_all_time_slots()
-    await callback.message.edit_reply_markup(reply_markup=keyboards.get_time_slots_keyboard(slots))
-
-@router.callback_query(F.data == "add_time_slot")
-async def add_time_slot_callback(callback: types.CallbackQuery, state: FSMContext):
-    admin_id = getenv("ADMIN_ID")
-    if not admin_id or str(callback.from_user.id) != admin_id:
-        return
-    await state.set_state(AddTimeSlotForm.time_value)
-    await callback.message.answer("Введите новое время в формате ЧЧ:ММ (например, 10:00) или несколько через запятую:", reply_markup=keyboards.get_cancel_admin_action_keyboard())
-    await callback.answer()
-
-@router.message(AddTimeSlotForm.time_value)
-async def process_time_slot(message: types.Message, state: FSMContext):
-    times = [t.strip() for t in message.text.split(",")]
+@router.message(WorkingHoursForm.hours)
+async def process_working_hours(message: types.Message, state: FSMContext):
     import re
-    valid = []
-    for t in times:
-        if re.match(r"^\d{2}:\d{2}$", t):
-            await database.add_time_slot(t)
-            valid.append(t)
+    wh = message.text.strip()
+    if not re.match(r"^\d{2}:\d{2}-\d{2}:\d{2}$", wh):
+        await message.answer("Неверный формат. Пожалуйста, введите в формате ЧЧ:ММ-ЧЧ:ММ (например, 10:00-20:00):", reply_markup=keyboards.get_cancel_admin_action_keyboard())
+        return
+    update_config("working_hours", wh)
     await state.clear()
-    slots = await database.get_all_time_slots()
-    if valid:
-        await message.answer(f"✅ Добавлено: {', '.join(valid)}", reply_markup=keyboards.get_time_slots_keyboard(slots))
-    else:
-        await message.answer("Неверный формат времени. Нужно так: 10:00", reply_markup=keyboards.get_time_slots_keyboard(slots))
+    await message.answer(f"✅ Рабочие часы успешно изменены на {wh}.")
+
+@router.callback_query(F.data == "settings_interval")
+async def settings_interval_cb(callback: types.CallbackQuery, state: FSMContext):
+    admin_id = getenv("ADMIN_ID")
+    if not admin_id or str(callback.from_user.id) != admin_id: return
+    current_interval = salon_config.get("schedule_interval", 30)
+    await state.set_state(ScheduleIntervalForm.interval)
+    await callback.message.edit_text(f"Текущий шаг записи: {current_interval} мин.\nВведите новый интервал в минутах (например, 15, 30, 60):", reply_markup=keyboards.get_cancel_admin_action_keyboard())
+
+@router.message(ScheduleIntervalForm.interval)
+async def process_schedule_interval(message: types.Message, state: FSMContext):
+    try:
+        val = int(message.text.strip())
+        if val <= 0: raise ValueError
+    except ValueError:
+        await message.answer("Пожалуйста, введите положительное число в минутах (например, 30):", reply_markup=keyboards.get_cancel_admin_action_keyboard())
+        return
+    update_config("schedule_interval", val)
+    await state.clear()
+    await message.answer(f"✅ Шаг записи изменен на {val} мин.")
 
 @router.message(F.text == "⚙️ Услуги")
 async def manage_services_handler(message: types.Message):
@@ -1437,12 +1439,24 @@ async def process_wizard_service_name(message: types.Message, state: FSMContext)
 
 @router.message(WizardAddServiceForm.price)
 async def process_wizard_service_price(message: types.Message, state: FSMContext):
+    await state.update_data(price=message.text)
+    await state.set_state(WizardAddServiceForm.duration)
+    await message.answer("Введите длительность услуги в минутах (например: 30, 60, 90, 120):", reply_markup=keyboards.get_cancel_admin_action_keyboard())
+
+@router.message(WizardAddServiceForm.duration)
+async def process_wizard_service_duration(message: types.Message, state: FSMContext):
     data = await state.get_data()
     name = data['name']
     target_id = data['target_id']
-    price = message.text
+    price = data['price']
     
-    await database.add_service(name=name, price=price, description="", category_id=target_id)
+    try:
+        duration = int(message.text.strip())
+    except ValueError:
+        await message.answer("Пожалуйста, введите число в минутах (например, 60):", reply_markup=keyboards.get_cancel_admin_action_keyboard())
+        return
+
+    await database.add_service(name=name, price=price, duration=duration, description="", category_id=target_id)
     
     # Retrieve wizard context to redraw keyboard
     main_id = data.get('main_id')
@@ -1618,11 +1632,24 @@ async def process_service_name(message: types.Message, state: FSMContext):
 
 @router.message(AddServiceForm.price)
 async def process_service_price(message: types.Message, state: FSMContext):
+    await state.update_data(price=message.text)
+    await state.set_state(AddServiceForm.duration)
+    await message.answer("Введите длительность услуги в минутах (например, 30, 60, 90):")
+
+@router.message(AddServiceForm.duration)
+async def process_service_duration(message: types.Message, state: FSMContext):
     data = await state.get_data()
     name = data['name']
     category_id = data.get('category_id')
-    price = message.text
-    await database.add_service(name=name, price=price, description="", category_id=category_id)
+    price = data['price']
+    
+    try:
+        duration = int(message.text.strip())
+    except ValueError:
+        await message.answer("Пожалуйста, введите число в минутах (например, 60):")
+        return
+        
+    await database.add_service(name=name, price=price, duration=duration, description="", category_id=category_id)
     await state.clear()
     
     services = await database.get_all_services()

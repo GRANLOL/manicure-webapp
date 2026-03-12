@@ -8,7 +8,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 from config import BOT_TOKEN, salon_config
-from database import init_db, get_all_busy_slots, get_all_services, get_all_time_slots, get_all_categories, get_all_masters
+from database import init_db, get_all_busy_slots, get_all_services, get_all_categories, get_all_masters
 from handlers import router
 from reminders import start_scheduler
 
@@ -34,21 +34,24 @@ async def get_busy_slots(master_id: int = None) -> dict:
 async def get_content() -> dict:
     services = await get_all_services()
     categories = await get_all_categories()
-    time_slots = await get_all_time_slots()
     masters = await get_all_masters()
     use_masters = salon_config.get("use_masters", False)
     booking_window = salon_config.get("booking_window", 7)
     working_days = salon_config.get("working_days", [1, 2, 3, 4, 5, 6, 0])
     blacklisted_dates = salon_config.get("blacklisted_dates", [])
+    working_hours = salon_config.get("working_hours", "10:00-20:00")
+    schedule_interval = salon_config.get("schedule_interval", 30)
+    
     return {
         "services": services,
         "categories": categories,
-        "time_slots": time_slots,
         "masters": masters,
         "use_masters": use_masters,
         "booking_window": booking_window,
         "working_days": working_days,
-        "blacklisted_dates": blacklisted_dates
+        "blacklisted_dates": blacklisted_dates,
+        "working_hours": working_hours,
+        "schedule_interval": schedule_interval
     }
 
 async def main():

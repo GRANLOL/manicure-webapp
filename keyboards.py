@@ -20,7 +20,7 @@ def get_main_menu(is_admin: bool = False, is_master: bool = False):
 admin_menu = ReplyKeyboardMarkup(
     keyboard=[
         [KeyboardButton(text="🗓 На сегодня"), KeyboardButton(text="🗓 Все записи"), KeyboardButton(text="📁 Категории")],
-        [KeyboardButton(text="⚙️ Услуги"), KeyboardButton(text="🕒 Время"), KeyboardButton(text="📅 Окно брони")],
+        [KeyboardButton(text="⚙️ Услуги"), KeyboardButton(text="📅 Окно брони")],
         [KeyboardButton(text="📅 График"), KeyboardButton(text="⚙️ Настройки"), KeyboardButton(text="📁 Excel")],
         [KeyboardButton(text="🗑 Очистить"), KeyboardButton(text="👤 Меню клиента")]
     ],
@@ -243,6 +243,8 @@ def get_system_settings_keyboard(use_masters: bool):
     if use_masters:
         builder.row(InlineKeyboardButton(text="👥 Управление мастерами", callback_data="manage_masters"))
     builder.row(InlineKeyboardButton(text="📬 Настройки напоминаний", callback_data="settings_reminders"))
+    builder.row(InlineKeyboardButton(text="🕒 Часы работы", callback_data="settings_working_hours"))
+    builder.row(InlineKeyboardButton(text="⏳ Шаг/Интервал записи", callback_data="settings_interval"))
     return builder.as_markup()
 
 def get_reminder_settings_keyboard():
