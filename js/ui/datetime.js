@@ -5,11 +5,16 @@ import { checkConfirmation } from './form.js';
 export function generateDates() {
     const dateContainer = document.getElementById('date-container');
     dateContainer.innerHTML = '';
-    const today = new Date();
+
+    // Calculate current time in salon's timezone
+    const nowLocal = new Date();
+    const utcMs = nowLocal.getTime() + (nowLocal.getTimezoneOffset() * 60000);
+    const salonNowMs = utcMs + (store.timezoneOffset * 3600000);
+    const todayTarget = new Date(salonNowMs);
 
     for (let i = 0; i < store.dynamicBookingWindow; i++) {
-        const targetDate = new Date();
-        targetDate.setDate(today.getDate() + i);
+        const targetDate = new Date(salonNowMs);
+        targetDate.setDate(todayTarget.getDate() + i);
 
         const dDay = store.days[targetDate.getDay()];
         const dMonth = store.shortMonths[targetDate.getMonth()];
@@ -68,6 +73,21 @@ export function generateTimes(formattedDate = null) {
     const interval = Number(store.scheduleInterval) || 30;
     const serviceDur = Number(store.selectedDuration) || 60;
 
+    // Timezone check to prevent booking in the past
+    let currentSalonMins = -1;
+    const nowLocal = new Date();
+    const utcMs = nowLocal.getTime() + (nowLocal.getTimezoneOffset() * 60000);
+    const salonNowMs = utcMs + (store.timezoneOffset * 3600000);
+    const salonNow = new Date(salonNowMs);
+
+    const sM = (salonNow.getMonth() + 1).toString().padStart(2, '0');
+    const sD = salonNow.getDate().toString().padStart(2, '0');
+    const salonTodayStr = `${sD}.${sM}.${salonNow.getFullYear()}`;
+
+    if (formattedDate === salonTodayStr) {
+        currentSalonMins = salonNow.getHours() * 60 + salonNow.getMinutes();
+    }
+
     for (let m = startMins; m + serviceDur <= endMins; m += interval) {
         const h = Math.floor(m / 60).toString().padStart(2, '0');
         const min = (m % 60).toString().padStart(2, '0');
@@ -92,7 +112,7 @@ export function generateTimes(formattedDate = null) {
         slot.className = 'time-slot fade-in';
         slot.textContent = timeStr;
 
-        if (isBusy) {
+        if (isBusy || m <= currentSalonMins) {
             slot.classList.add('slot-busy');
         } else {
             slot.onclick = () => selectTime(slot, timeStr);

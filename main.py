@@ -41,6 +41,7 @@ async def get_content() -> dict:
     blacklisted_dates = salon_config.get("blacklisted_dates", [])
     working_hours = salon_config.get("working_hours", "10:00-20:00")
     schedule_interval = salon_config.get("schedule_interval", 30)
+    timezone_offset = salon_config.get("timezone_offset", 3)
     
     return {
         "services": services,
@@ -51,7 +52,8 @@ async def get_content() -> dict:
         "working_days": working_days,
         "blacklisted_dates": blacklisted_dates,
         "working_hours": working_hours,
-        "schedule_interval": schedule_interval
+        "schedule_interval": schedule_interval,
+        "timezone_offset": timezone_offset
     }
 
 async def main():

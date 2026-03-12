@@ -54,6 +54,7 @@ export async function fetchContent() {
             if (data.booking_window) store.dynamicBookingWindow = data.booking_window;
             if (data.working_days) store.workingDays = data.working_days;
             if (data.blacklisted_dates) store.blacklistedDates = data.blacklisted_dates;
+            if (data.timezone_offset !== undefined) store.timezoneOffset = data.timezone_offset;
         }
     } catch (e) {
         console.error("Error fetching available content:", e);

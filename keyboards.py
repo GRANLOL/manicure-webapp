@@ -245,6 +245,7 @@ def get_system_settings_keyboard(use_masters: bool):
     if use_masters:
         builder.row(InlineKeyboardButton(text="👥 Управление мастерами", callback_data="manage_masters"))
     builder.row(InlineKeyboardButton(text="📬 Настройки напоминаний", callback_data="settings_reminders"))
+    builder.row(InlineKeyboardButton(text="🌍 Часовой пояс (UTC)", callback_data="settings_timezone"))
     builder.row(InlineKeyboardButton(text="🕒 Часы работы", callback_data="settings_working_hours"))
     builder.row(InlineKeyboardButton(text="⏳ Шаг/Интервал записи", callback_data="settings_interval"))
     return builder.as_markup()

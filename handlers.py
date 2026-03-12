@@ -656,6 +656,14 @@ class EditServiceNameForm(StatesGroup):
 class EditServicePriceForm(StatesGroup):
     value = State()
 
+class EditReminderSettingsForm(StatesGroup):
+    text_1 = State()
+    text_2 = State()
+    time_2 = State()
+
+class EditTimezoneForm(StatesGroup):
+    offset = State()
+
 class EditServiceDurationForm(StatesGroup):
     value = State()
 
@@ -732,22 +740,6 @@ async def toggle_use_masters_callback(callback: types.CallbackQuery):
         reply_markup=keyboards.get_system_settings_keyboard(use_masters)
     )
 
-@router.callback_query(F.data == "manage_masters")
-async def manage_masters_callback(callback: types.CallbackQuery):
-    admin_id = getenv("ADMIN_ID")
-    if not admin_id or str(callback.from_user.id) != admin_id:
-        return
-        
-    masters = await database.get_all_masters()
-    text = "Управление мастерами:\n"
-    if not masters:
-        text += "Список пуст."
-    else:
-        for m in masters:
-            text += f"• {m['name']} (ID: {m['telegram_id']})\n"
-            
-    await callback.message.edit_text(text, reply_markup=keyboards.get_masters_keyboard(masters))
-
 @router.callback_query(F.data == "back_to_settings")
 async def back_to_settings_callback(callback: types.CallbackQuery):
     admin_id = getenv("ADMIN_ID")
@@ -761,21 +753,12 @@ async def back_to_settings_callback(callback: types.CallbackQuery):
 
 # --- Настройки напоминаний ---
 @router.callback_query(F.data == "settings_reminders")
-async def settings_reminders_cb(callback: types.CallbackQuery):
+async def settings_reminders_callback(callback: types.CallbackQuery):
     admin_id = getenv("ADMIN_ID")
     if not admin_id or str(callback.from_user.id) != admin_id:
         return
-        
-    t1 = salon_config.get("reminder_1_text", "Здравствуйте, {name}! Напоминаем о вашей записи к мастеру {master} завтра ({date}) в {time}.")
-    t2 = salon_config.get("reminder_2_text", "Здравствуйте, {name}! Напоминаем, ваша запись к мастеру {master} состоится сегодня ({date}) в {time}.")
-    h2 = salon_config.get("reminder_2_hours", 3)
-    
-    text = (
-        f"<b>Текущие настройки напоминаний:</b>\n\n"
-        f"<b>1️⃣ Напоминание (за 24 часа):</b>\n<i>{t1}</i>\n\n"
-        f"<b>2️⃣ Напоминание (за {h2} ч.):</b>\n<i>{t2}</i>\n"
-    )
-    await callback.message.edit_text(text, reply_markup=keyboards.get_reminder_settings_keyboard(), parse_mode="HTML")
+    text = "Настройки напоминаний:\n\n1. За 24 часа\n2. Второе уведомление (по умолчанию за 3 часа)"
+    await callback.message.edit_text(text, reply_markup=keyboards.get_reminder_settings_keyboard())
 
 @router.callback_query(F.data == "edit_rem_text_1")
 async def edit_rem_text_1_cb(callback: types.CallbackQuery, state: FSMContext):
@@ -839,6 +822,34 @@ async def process_rem_time_2(message: types.Message, state: FSMContext):
     update_config("reminder_2_hours", hours)
     await state.clear()
     await message.answer(f"✅ Время второго напоминания успешно изменено на {hours} ч.")
+
+@router.callback_query(F.data == "settings_timezone")
+async def settings_timezone_callback(callback: types.CallbackQuery, state: FSMContext):
+    admin_id = getenv("ADMIN_ID")
+    if not admin_id or str(callback.from_user.id) != admin_id:
+        return
+        
+    current_tz = salon_config.get("timezone_offset", 3)
+    text = f"🌍 Настройка часового пояса\n\nТекущее смещение: UTC{'+' if current_tz >= 0 else ''}{current_tz}\n\nВведите новое смещение в часах (например: 3 для Москвы, 5 для Екатеринбурга, -4 для Нью-Йорка):"
+    
+    await state.set_state(EditTimezoneForm.offset)
+    await callback.message.edit_text(text, reply_markup=keyboards.get_cancel_admin_action_keyboard())
+
+@router.message(EditTimezoneForm.offset)
+async def process_timezone_offset(message: types.Message, state: FSMContext):
+    try:
+        offset = int(message.text.replace('+', '').strip())
+        if not (-12 <= offset <= 14):
+            raise ValueError()
+    except ValueError:
+        await message.answer("Пожалуйста, введите корректное число от -12 до 14 (например, 3 или -5).")
+        return
+        
+    update_config("timezone_offset", offset)
+    await state.clear()
+    
+    use_masters = salon_config.get("use_masters", False)
+    await message.answer(f"✅ Часовой пояс успешно сохранен: UTC{'+' if offset >= 0 else ''}{offset}", reply_markup=keyboards.get_system_settings_keyboard(use_masters))
 
 @router.callback_query(F.data.startswith("del_master_"))
 async def del_master_callback(callback: types.CallbackQuery):
