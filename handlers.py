@@ -1656,48 +1656,6 @@ async def process_service_duration(message: types.Message, state: FSMContext):
     await message.answer(f"✅ Услуга '{name}' добавлена!", reply_markup=keyboards.get_services_keyboard(services))
 
 
-@router.message(F.text == "🕒 Управление временем")
-async def manage_time_slots_handler(message: types.Message):
-    admin_id = getenv("ADMIN_ID")
-    if not admin_id or str(message.from_user.id) != admin_id:
-        return
-        
-    time_slots = await database.get_all_time_slots()
-    if not time_slots:
-        await message.answer("Список доступного времени пуст.", reply_markup=keyboards.get_time_slots_keyboard(time_slots))
-    else:
-        text = "Список доступных слотов:\n"
-        for ts in time_slots:
-            text += f"• {ts['time_value']}\n"
-        await message.answer(text, reply_markup=keyboards.get_time_slots_keyboard(time_slots))
-
-@router.callback_query(F.data.startswith("del_ts_"))
-async def del_time_slot_callback(callback: types.CallbackQuery):
-    admin_id = getenv("ADMIN_ID")
-    if not admin_id or str(callback.from_user.id) != admin_id:
-        return
-    ts_id = int(callback.data.split("_")[2])
-    await database.delete_time_slot(ts_id)
-    time_slots = await database.get_all_time_slots()
-    await callback.message.edit_text("Таймслот удален. Список текущих слотов:", reply_markup=keyboards.get_time_slots_keyboard(time_slots))
-
-@router.callback_query(F.data == "add_time_slot")
-async def add_time_slot_callback(callback: types.CallbackQuery, state: FSMContext):
-    admin_id = getenv("ADMIN_ID")
-    if not admin_id or str(callback.from_user.id) != admin_id:
-        return
-    await state.set_state(AddTimeSlotForm.time_value)
-    await callback.message.answer("Введите новое время в формате ЧЧ:ММ (например, '14:30'):")
-    await callback.answer()
-
-@router.message(AddTimeSlotForm.time_value)
-async def process_time_slot_value(message: types.Message, state: FSMContext):
-    time_val = message.text
-    await database.add_time_slot(time_value=time_val)
-    await state.clear()
-    
-    time_slots = await database.get_all_time_slots()
-    await message.answer(f"✅ Время '{time_val}' добавлено!", reply_markup=keyboards.get_time_slots_keyboard(time_slots))
 
 
 # ========================================
