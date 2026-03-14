@@ -41,6 +41,14 @@ async def back_to_settings_callback(callback: types.CallbackQuery):
         reply_markup=keyboards.get_system_settings_keyboard(use_masters)
     )
 
+@router.callback_query(F.data == "manage_masters")
+async def manage_masters_callback(callback: types.CallbackQuery):
+    admin_id = getenv("ADMIN_ID")
+    if not admin_id or str(callback.from_user.id) != admin_id:
+        return
+    masters = await database.get_all_masters()
+    await callback.message.edit_text("Управление мастерами:", reply_markup=keyboards.get_masters_keyboard(masters))
+
 @router.callback_query(F.data == "settings_reminders")
 async def settings_reminders_callback(callback: types.CallbackQuery):
     admin_id = getenv("ADMIN_ID")

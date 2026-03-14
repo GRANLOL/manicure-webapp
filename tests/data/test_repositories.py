@@ -1,5 +1,6 @@
 import unittest
 
+from repositories.analytics import get_revenue_stats
 from repositories.bookings import create_booking_if_available, get_all_bookings
 from repositories.categories import (
     add_category,
@@ -75,6 +76,24 @@ class BookingRepositoryTests(RepositoryTestCase):
 
         self.assertTrue(first)
         self.assertTrue(second)
+
+    async def test_revenue_stats_counts_bookings_in_period(self):
+        await create_booking_if_available(
+            user_id=1,
+            name="Alice",
+            phone="+10000000001",
+            date="15.03.2026",
+            time="10:00",
+            master_id=1,
+            duration=60,
+            service_name="Маникюр",
+            price=2000,
+        )
+
+        stats = await get_revenue_stats(30)
+
+        self.assertEqual(stats["total_bookings"], 1)
+        self.assertEqual(stats["total_revenue"], 2000)
 
 
 class CategoryRepositoryTests(RepositoryTestCase):

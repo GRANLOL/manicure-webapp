@@ -48,16 +48,6 @@ def get_service_edit_keyboard(service):
     builder.row(InlineKeyboardButton(text="◀️ Назад к списку", callback_data="back_to_services"))
     return builder.as_markup()
 
-def get_time_slots_keyboard(time_slots):
-    from aiogram.utils.keyboard import InlineKeyboardBuilder
-    builder = InlineKeyboardBuilder()
-    for ts in time_slots:
-        val = ts['time_value'] if isinstance(ts, dict) else ts[1]
-        ts_id = ts['id'] if isinstance(ts, dict) else ts[0]
-        builder.row(InlineKeyboardButton(text=f"❌ Удалить {val}", callback_data=f"del_ts_{ts_id}"))
-    builder.row(InlineKeyboardButton(text="➕ Добавить слоты", callback_data="add_time_slot"))
-    return builder.as_markup()
-
 def build_category_tree(categories, parent_id=None, depth=0, branch=None):
     if branch is None:
         branch = set()

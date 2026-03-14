@@ -7,6 +7,32 @@ from tests.support import make_callback, make_message, make_state
 
 
 class CatalogHandlerTests(unittest.IsolatedAsyncioTestCase):
+    async def test_edit_service_duration_callback_starts_duration_flow(self):
+        callback = make_callback(data="eds_dur_7", user_id=1)
+        state = make_state()
+
+        with patch.object(catalog_handlers.keyboards, "get_cancel_admin_action_keyboard", return_value="kb"):
+            await catalog_handlers.eds_duration_callback(callback, state)
+
+        state.update_data.assert_awaited_once_with(service_id=7)
+        state.set_state.assert_awaited_once()
+        callback.message.answer.assert_awaited_once_with(ANY, reply_markup="kb")
+        callback.answer.assert_awaited_once()
+
+    async def test_process_edit_service_duration_updates_service(self):
+        message = make_message(text="90")
+        state = make_state(data={"service_id": 7})
+        service = {"id": 7, "name": "Маникюр", "price": "2500", "duration": 90, "category_name": None}
+
+        with patch.object(catalog_handlers.database, "update_service_duration") as update_mock, \
+             patch.object(catalog_handlers.database, "get_service_by_id", return_value=service), \
+             patch.object(catalog_handlers.keyboards, "get_service_edit_keyboard", return_value="kb"):
+            await catalog_handlers.process_edit_service_duration(message, state)
+
+        update_mock.assert_awaited_once_with(7, 90)
+        state.clear.assert_awaited_once()
+        message.answer.assert_awaited_once_with(ANY, reply_markup="kb")
+
     async def test_move_category_callback_filters_invalid_targets(self):
         callback = make_callback(data="move_cat_2", user_id=1)
         state = make_state()
@@ -67,6 +93,17 @@ class CatalogHandlerTests(unittest.IsolatedAsyncioTestCase):
 
 
 class SettingsHandlerTests(unittest.IsolatedAsyncioTestCase):
+    async def test_manage_masters_callback_opens_masters_list(self):
+        callback = make_callback(data="manage_masters", user_id=1)
+        masters = [{"id": 1, "name": "Anna"}]
+
+        with patch.object(settings_handlers, "getenv", return_value="1"), \
+             patch.object(settings_handlers.database, "get_all_masters", return_value=masters), \
+             patch.object(settings_handlers.keyboards, "get_masters_keyboard", return_value="kb"):
+            await settings_handlers.manage_masters_callback(callback)
+
+        callback.message.edit_text.assert_awaited_once_with("Управление мастерами:", reply_markup="kb")
+
     async def test_toggle_use_masters_updates_config_and_markup(self):
         callback = make_callback(data="toggle_use_masters", user_id=1)
 

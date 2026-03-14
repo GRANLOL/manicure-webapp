@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from .base import _parse_booking_date, _period_start_date
+from .base import _parse_booking_date, _period_start_date, aiosqlite
 
 async def _get_bookings_in_period(period_days: int):
     start_date = _period_start_date(period_days)

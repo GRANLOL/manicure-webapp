@@ -44,6 +44,7 @@ class EditServiceForm(StatesGroup):
     service_id = State()
     name = State()
     price = State()
+    duration = State()
     category_id = State()
 
 

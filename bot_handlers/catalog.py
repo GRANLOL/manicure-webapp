@@ -144,6 +144,35 @@ async def process_edit_service_price(message: types.Message, state: FSMContext):
     text = f"✅ Цена изменена!\n\n⚙️ Редактирование услуги:\n\n📝 Название: {service['name']}\n💸 Цена: {service['price']}₽{cat_info}"
     await message.answer(text, reply_markup=keyboards.get_service_edit_keyboard(service))
 
+@router.callback_query(F.data.startswith("eds_dur_"))
+async def eds_duration_callback(callback: types.CallbackQuery, state: FSMContext):
+    srv_id = int(callback.data.split("_")[2])
+    await state.update_data(service_id=srv_id)
+    await state.set_state(EditServiceForm.duration)
+    await callback.message.answer("Введите новую длительность услуги в минутах:", reply_markup=keyboards.get_cancel_admin_action_keyboard())
+    await callback.answer()
+
+@router.message(EditServiceForm.duration)
+async def process_edit_service_duration(message: types.Message, state: FSMContext):
+    data = await state.get_data()
+    srv_id = data['service_id']
+    try:
+        duration = int(message.text.strip())
+        if duration <= 0:
+            raise ValueError
+    except ValueError:
+        await message.answer("Пожалуйста, введите положительное число минут.", reply_markup=keyboards.get_cancel_admin_action_keyboard())
+        return
+
+    await database.update_service_duration(srv_id, duration)
+    await state.clear()
+
+    service = await database.get_service_by_id(srv_id)
+    cat_name = service.get('category_name')
+    cat_info = f"\n📁 Категория: {cat_name}" if cat_name else "\n📁 Категория: Без категории"
+    text = f"✅ Длительность изменена!\n\n⚙️ Редактирование услуги:\n\n📝 Название: {service['name']}\n💸 Цена: {service['price']}₽\n⏱ Длительность: {service.get('duration', duration)} м{cat_info}"
+    await message.answer(text, reply_markup=keyboards.get_service_edit_keyboard(service))
+
 @router.callback_query(F.data.startswith("eds_cat_"))
 async def eds_cat_callback(callback: types.CallbackQuery, state: FSMContext):
     srv_id = int(callback.data.split("_")[2])

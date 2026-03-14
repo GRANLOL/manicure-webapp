@@ -5,6 +5,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 import repositories.bookings as bookings_repo
+import repositories.analytics as analytics_repo
 import repositories.categories as categories_repo
 import repositories.schema as schema_repo
 from repositories.schema import init_db
@@ -19,7 +20,7 @@ class RepositoryTestCase(unittest.IsolatedAsyncioTestCase):
         def connect_override(_path, *args, **kwargs):
             return original_connect(self._db_path, *args, **kwargs)
 
-        for module in (schema_repo, bookings_repo, categories_repo):
+        for module in (schema_repo, bookings_repo, categories_repo, analytics_repo):
             self._patches.enter_context(
                 patch.object(module.aiosqlite, "connect", side_effect=connect_override)
             )
