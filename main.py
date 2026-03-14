@@ -1,20 +1,17 @@
 import asyncio
-import hashlib
-import hmac
 import logging
 import sys
-import time
-from urllib.parse import parse_qsl
 
 from aiogram import Bot, Dispatcher
 from aiogram.types import BotCommand
 from fastapi import FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
-from config import BOT_TOKEN, salon_config
+from config import BOT_TOKEN, WEBAPP_AUTH_REQUIRED, WEBAPP_URL, salon_config
 from database import init_db, get_all_busy_slots, get_all_services, get_all_categories, get_all_masters
-from handlers import router
+from bot_handlers import router
 from reminders import start_scheduler
+from webapp_security import allowed_origins, verify_telegram_init_data
 
 # Setup basic logging
 logging.basicConfig(level=logging.INFO, stream=sys.stdout)
@@ -23,41 +20,17 @@ app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*", "https://granlol.github.io"],
+    allow_origins=allowed_origins(WEBAPP_URL),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 
-def verify_telegram_init_data(init_data: str) -> bool:
-    if not init_data:
-        return False
-
-    pairs = parse_qsl(init_data, keep_blank_values=True)
-    data = dict(pairs)
-    received_hash = data.pop("hash", None)
-    if not received_hash:
-        return False
-
-    auth_date = data.get("auth_date")
-    if not auth_date:
-        return False
-
-    try:
-        if time.time() - int(auth_date) > 86400:
-            return False
-    except ValueError:
-        return False
-
-    data_check_string = "\n".join(f"{key}={value}" for key, value in sorted(data.items()))
-    secret_key = hmac.new(b"WebAppData", BOT_TOKEN.encode(), hashlib.sha256).digest()
-    calculated_hash = hmac.new(secret_key, data_check_string.encode(), hashlib.sha256).hexdigest()
-    return hmac.compare_digest(calculated_hash, received_hash)
-
-
 def require_webapp_auth(x_telegram_init_data: str | None) -> None:
-    if not verify_telegram_init_data(x_telegram_init_data or ""):
+    if not WEBAPP_AUTH_REQUIRED:
+        return
+    if not verify_telegram_init_data(x_telegram_init_data or "", BOT_TOKEN):
         raise HTTPException(status_code=401, detail="Unauthorized")
 
 @app.get("/api/busy-slots")
@@ -102,7 +75,7 @@ async def main():
     bot = Bot(token=BOT_TOKEN)
     dp = Dispatcher()
     
-    # Include the router from handlers.py
+    # Include the aggregated router package
     dp.include_router(router)
     
     # Set bot commands in the menu

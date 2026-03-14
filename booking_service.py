@@ -1,4 +1,5 @@
 from os import getenv
+from html import escape
 
 from aiogram import types
 
@@ -22,7 +23,7 @@ async def finalize_web_booking(
 ) -> None:
     full_name_service = f"{name} ({service})" if name else f"{message.from_user.full_name} ({service})"
 
-    await database.add_booking(
+    booking_created = await database.create_booking_if_available(
         user_id=message.from_user.id,
         name=full_name_service,
         phone=phone,
@@ -33,6 +34,9 @@ async def finalize_web_booking(
         service_name=service,
         price=price,
     )
+    if not booking_created:
+        await message.answer("Выбранный слот уже заняли. Обновите форму и выберите другое время.")
+        return
 
     remove_msg = await message.answer("⏳ Загрузка...", reply_markup=types.ReplyKeyboardRemove())
     await remove_msg.delete()
@@ -60,11 +64,15 @@ async def finalize_web_booking(
 
 
 def format_user_booking_text(name: str, phone: str, date: str, time: str) -> str:
+    safe_name = escape(name)
+    safe_phone = escape(phone)
+    safe_date = escape(date)
+    safe_time = escape(time)
     text = "🗓 <b>Ваша запись:</b>\n\n"
-    text += f"👤 <b>Имя/Услуга:</b> {name}\n"
-    text += f"📅 <b>Дата:</b> {date}\n"
-    text += f"⏰ <b>Время:</b> {time}\n"
-    text += f"📞 <b>Телефон:</b> {phone}\n"
+    text += f"👤 <b>Имя/Услуга:</b> {safe_name}\n"
+    text += f"📅 <b>Дата:</b> {safe_date}\n"
+    text += f"⏰ <b>Время:</b> {safe_time}\n"
+    text += f"📞 <b>Телефон:</b> {safe_phone}\n"
     return text
 
 

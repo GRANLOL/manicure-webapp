@@ -11,3 +11,4 @@ bookings.db
 config.json
 run_stdout.log
 run_stderr.log
+.test_tmp/

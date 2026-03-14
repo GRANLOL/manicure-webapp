@@ -16,6 +16,20 @@ BOT_TOKEN = os.getenv("BOT_TOKEN")
 ADMIN_ID = os.getenv("ADMIN_ID")
 WEBAPP_URL = os.getenv("WEBAPP_URL", salon_config.get("webapp_url", "https://granlol.github.io/manicure-webapp/"))
 
+
+def _as_bool(value, default=False):
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return value
+    return str(value).strip().lower() in {"1", "true", "yes", "on"}
+
+
+WEBAPP_AUTH_REQUIRED = _as_bool(
+    os.getenv("WEBAPP_AUTH_REQUIRED"),
+    salon_config.get("webapp_auth_required", True),
+)
+
 if not BOT_TOKEN:
     raise ValueError("No BOT_TOKEN provided in the .env file")
 
