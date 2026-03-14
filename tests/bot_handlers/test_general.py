@@ -21,10 +21,26 @@ class GeneralHandlerTests(unittest.IsolatedAsyncioTestCase):
 
         with patch.object(general_handlers, "getenv", return_value=None), \
              patch.dict(general_handlers.salon_config, {"use_masters": False, "welcome_text": "hello"}, clear=False), \
-             patch.object(general_handlers.keyboards, "get_main_menu", return_value="menu"):
+             patch.object(general_handlers.keyboards, "get_main_menu", return_value="menu"), \
+             patch.object(general_handlers.keyboards, "get_booking_launch_keyboard", return_value="launch"):
             await general_handlers.start_handler(message)
 
-        message.answer.assert_awaited_once_with("hello", reply_markup="menu")
+        self.assertEqual(message.answer.await_count, 2)
+        message.answer.assert_any_await("hello", reply_markup="launch")
+        message.answer.assert_any_await("Меню клиента обновлено.", reply_markup="menu")
+
+    async def test_client_menu_handler_refreshes_launch_and_reply_keyboards(self):
+        message = make_message(user_id=1, text="👤 Меню клиента")
+
+        with patch.object(general_handlers, "getenv", return_value="1"), \
+             patch.dict(general_handlers.salon_config, {"use_masters": False}, clear=False), \
+             patch.object(general_handlers.keyboards, "get_main_menu", return_value="menu"), \
+             patch.object(general_handlers.keyboards, "get_booking_launch_keyboard", return_value="launch"):
+            await general_handlers.client_menu_handler(message)
+
+        self.assertEqual(message.answer.await_count, 2)
+        message.answer.assert_any_await("Вы переключились в главное меню клиента.", reply_markup="launch")
+        message.answer.assert_any_await("Меню клиента обновлено.", reply_markup="menu")
 
     async def test_export_excel_handler_sends_document_for_admin(self):
         message = make_message(user_id=1)

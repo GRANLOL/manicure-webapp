@@ -3,7 +3,11 @@ import hmac
 import time
 import unittest
 
-from webapp_security import allowed_origins, verify_telegram_init_data
+from webapp_security import (
+    allowed_origins,
+    get_init_data_validation_error,
+    verify_telegram_init_data,
+)
 
 
 def build_init_data(bot_token: str, **fields: str) -> str:
@@ -33,6 +37,7 @@ class WebappSecurityTests(unittest.TestCase):
         )
 
         self.assertTrue(verify_telegram_init_data(init_data, bot_token))
+        self.assertIsNone(get_init_data_validation_error(init_data, bot_token))
 
     def test_verify_telegram_init_data_rejects_expired_signature(self):
         bot_token = "123:abc"
@@ -44,6 +49,7 @@ class WebappSecurityTests(unittest.TestCase):
         )
 
         self.assertFalse(verify_telegram_init_data(init_data, bot_token))
+        self.assertIn("expired auth_date", get_init_data_validation_error(init_data, bot_token))
 
     def test_verify_telegram_init_data_rejects_tampered_signature(self):
         bot_token = "123:abc"
@@ -55,3 +61,4 @@ class WebappSecurityTests(unittest.TestCase):
         ).replace("Test", "Hacker")
 
         self.assertFalse(verify_telegram_init_data(init_data, bot_token))
+        self.assertEqual(get_init_data_validation_error(init_data, bot_token), "hash mismatch")

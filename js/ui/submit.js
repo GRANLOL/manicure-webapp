@@ -2,7 +2,30 @@ import { tg } from '../telegram.js';
 import { store } from '../store.js';
 import { config } from '../config.js';
 
-export function submitData() {
+async function postBooking(data) {
+    const headers = {
+        'Content-Type': 'application/json',
+        'ngrok-skip-browser-warning': 'true',
+    };
+
+    if (tg.initData) {
+        headers['X-Telegram-Init-Data'] = tg.initData;
+    }
+
+    const response = await fetch(`${config.apiBaseUrl}/bookings`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(data),
+    });
+
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+        throw new Error(payload.detail || `Server returned ${response.status}`);
+    }
+    return payload;
+}
+
+export async function submitData() {
     tg.HapticFeedback.impactOccurred('medium');
     if (!store.selectedService || !store.selectedDate || !store.selectedTime) return;
 
@@ -17,7 +40,7 @@ export function submitData() {
     const nameInput = document.getElementById('name-input');
 
     modalSubmit.disabled = true;
-    modalSubmit.textContent = "Секунду...";
+    modalSubmit.textContent = 'Секунду...';
 
     const data = {
         service: store.selectedService,
@@ -26,37 +49,49 @@ export function submitData() {
         duration: store.selectedDuration || 60,
         price: store.selectedPrice || 0,
         phone: phoneInput.value,
-        name: nameInput.value.trim()
+        name: nameInput.value.trim(),
     };
 
     if (store.useMasters && store.selectedMaster) {
         data.master_id = store.selectedMaster.id;
     }
 
-    setTimeout(() => {
-        // Hide Confirmation Modal and Telegram Main Button
+    try {
+        await postBooking(data);
+
         modal.classList.remove('active');
         tg.MainButton.hide();
 
-        // Populate and Show Success Screen
         successService.textContent = store.selectedService;
-        successDate.textContent = document.querySelector('.date-card.active .date-num').textContent + ' ' + document.querySelector('.date-card.active .date-month').textContent;
+        successDate.textContent =
+            document.querySelector('.date-card.active .date-num').textContent +
+            ' ' +
+            document.querySelector('.date-card.active .date-month').textContent;
         successTime.textContent = store.selectedTime;
 
-        // Step 1: Immediately trigger fade-in
         successScreen.classList.add('active');
         tg.HapticFeedback.notificationOccurred('success');
 
-        // Step 2: requestAnimationFrame to smoothly draw checkmark animation
         requestAnimationFrame(() => {
             requestAnimationFrame(() => {
                 successScreen.classList.add('animate');
             });
         });
 
-        // Step 3: Call tg.sendData after 2.5 seconds
         setTimeout(() => {
-            tg.sendData(JSON.stringify(data));
-        }, 2500);
-    }, 0);
+            if (tg.close) {
+                tg.close();
+            }
+        }, 1800);
+    } catch (error) {
+        console.error('Booking submit failed:', error);
+        tg.HapticFeedback.notificationOccurred('error');
+        alert(error.message || 'Не удалось оформить запись.');
+    } finally {
+        modalSubmit.disabled = false;
+        modalSubmit.textContent = 'Записаться';
+        if (tg.MainButton.hideProgress) {
+            tg.MainButton.hideProgress();
+        }
+    }
 }

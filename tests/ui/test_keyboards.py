@@ -1,5 +1,6 @@
 import unittest
 
+import bot_keyboards.common as common_keyboards
 import bot_keyboards.catalog as catalog_keyboards
 import bot_keyboards.menus as menu_keyboards
 
@@ -13,6 +14,7 @@ class KeyboardTests(unittest.TestCase):
         extended_count = sum(len(row) for row in extended_markup.keyboard)
 
         self.assertGreater(extended_count, base_count)
+        self.assertIsNone(base_markup.keyboard[0][0].web_app)
 
     def test_build_category_tree_avoids_infinite_recursion_with_cycle(self):
         categories = [
@@ -33,3 +35,9 @@ class KeyboardTests(unittest.TestCase):
 
         self.assertIn("srv_page_1", callback_data)
         self.assertIn("add_service", callback_data)
+
+    def test_get_booking_launch_keyboard_uses_inline_web_app_button(self):
+        markup = common_keyboards.get_booking_launch_keyboard()
+        button = markup.inline_keyboard[0][0]
+
+        self.assertIsNotNone(button.web_app)

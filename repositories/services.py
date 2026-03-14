@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+
 from .base import aiosqlite
 
 async def add_service(name: str, price: str, duration: int = 60, description: str = "", category_id: int | None = None):

@@ -10,13 +10,17 @@ import uvicorn
 from config import BOT_TOKEN, WEBAPP_AUTH_REQUIRED, WEBAPP_URL, salon_config
 from database import init_db, get_all_busy_slots, get_all_services, get_all_categories, get_all_masters
 from bot_handlers import router
+from booking_service import create_booking_and_notify
+from booking_validation import validate_web_booking
 from reminders import start_scheduler
-from webapp_security import allowed_origins, verify_telegram_init_data
+from webapp_security import allowed_origins, get_init_data_validation_error, get_user_from_init_data
 
 # Setup basic logging
 logging.basicConfig(level=logging.INFO, stream=sys.stdout)
+logger = logging.getLogger(__name__)
 
 app = FastAPI()
+app.state.bot = None
 
 app.add_middleware(
     CORSMiddleware,
@@ -30,7 +34,14 @@ app.add_middleware(
 def require_webapp_auth(x_telegram_init_data: str | None) -> None:
     if not WEBAPP_AUTH_REQUIRED:
         return
-    if not verify_telegram_init_data(x_telegram_init_data or "", BOT_TOKEN):
+    error = get_init_data_validation_error(x_telegram_init_data or "", BOT_TOKEN)
+    if error is not None:
+        logger.warning(
+            "WebApp auth rejected: %s (header_present=%s, init_data_len=%s)",
+            error,
+            x_telegram_init_data is not None,
+            len(x_telegram_init_data or ""),
+        )
         raise HTTPException(status_code=401, detail="Unauthorized")
 
 @app.get("/api/busy-slots")
@@ -66,6 +77,35 @@ async def get_content(x_telegram_init_data: str | None = Header(default=None)) -
         "timezone_offset": timezone_offset
     }
 
+
+@app.post("/api/bookings")
+async def create_booking(payload: dict, x_telegram_init_data: str | None = Header(default=None)) -> dict:
+    require_webapp_auth(x_telegram_init_data)
+    user = get_user_from_init_data(x_telegram_init_data or "")
+    if not user or "id" not in user:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    validated, error_text = await validate_web_booking(payload)
+    if error_text:
+        raise HTTPException(status_code=400, detail=error_text)
+
+    success, message = await create_booking_and_notify(
+        bot=app.state.bot,
+        user_id=int(user["id"]),
+        user_full_name=user.get("first_name") or user.get("username") or "Telegram user",
+        service=validated["service"]["name"],
+        date=validated["date"],
+        time=validated["time"],
+        duration=validated["duration"],
+        phone=validated["phone"],
+        name=validated["name"],
+        price=validated["price"],
+        master_id=validated["master_id"],
+    )
+    if not success:
+        raise HTTPException(status_code=409, detail=message)
+    return {"ok": True, "message": message}
+
 async def main():
     # Initialize the database
     await init_db()
@@ -73,6 +113,7 @@ async def main():
 
     # Initialize bot and dispatcher
     bot = Bot(token=BOT_TOKEN)
+    app.state.bot = bot
     dp = Dispatcher()
     
     # Include the aggregated router package

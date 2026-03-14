@@ -7,6 +7,68 @@ import database
 import keyboards
 
 
+async def create_booking_and_notify(
+    *,
+    bot,
+    user_id: int,
+    user_full_name: str,
+    service: str,
+    date: str,
+    time: str,
+    duration: int,
+    phone: str,
+    name: str,
+    price: int,
+    master_id: int | None,
+) -> tuple[bool, str]:
+    full_name_service = f"{name} ({service})" if name else f"{user_full_name} ({service})"
+
+    booking_created = await database.create_booking_if_available(
+        user_id=user_id,
+        name=full_name_service,
+        phone=phone,
+        date=date,
+        time=time,
+        master_id=master_id,
+        duration=duration,
+        service_name=service,
+        price=price,
+    )
+    if not booking_created:
+        return False, "Выбранный слот уже заняли. Обновите форму и выберите другое время."
+
+    msg_text = (
+        f"🔔 НОВАЯ ЗАПИСЬ!\n\n"
+        f"👤 Клиент: {full_name_service}\n"
+        f"📞 Тел: {phone}\n"
+        f"📅 Дата: {date}\n"
+        f"⏰ Время: {time}"
+    )
+    admin_id = getenv("ADMIN_ID")
+    if admin_id and bot is not None:
+        try:
+            await bot.send_message(admin_id, msg_text)
+        except Exception:
+            pass
+
+    if master_id and bot is not None:
+        try:
+            master = await database.get_master_by_id(master_id)
+            if master and master.get("telegram_id"):
+                await bot.send_message(master["telegram_id"], msg_text)
+        except Exception:
+            pass
+
+    return True, (
+        f"✅ Запись подтверждена!\n\n"
+        f"Услуга: {service}\n"
+        f"📅 Дата: {date}\n"
+        f"⏰ Время: {time}\n"
+        f"📞 Телефон: {phone}\n\n"
+        f"Ждем вас!"
+    )
+
+
 async def finalize_web_booking(
     message: types.Message,
     *,
@@ -21,46 +83,30 @@ async def finalize_web_booking(
     is_admin: bool,
     is_master: bool,
 ) -> None:
-    full_name_service = f"{name} ({service})" if name else f"{message.from_user.full_name} ({service})"
-
-    booking_created = await database.create_booking_if_available(
+    success, result_text = await create_booking_and_notify(
+        bot=message.bot,
         user_id=message.from_user.id,
-        name=full_name_service,
-        phone=phone,
+        user_full_name=message.from_user.full_name,
+        service=service,
         date=date,
         time=time,
-        master_id=master_id,
         duration=duration,
-        service_name=service,
+        phone=phone,
+        name=name,
         price=price,
+        master_id=master_id,
     )
-    if not booking_created:
-        await message.answer("Выбранный слот уже заняли. Обновите форму и выберите другое время.")
+    if not success:
+        await message.answer(result_text)
         return
 
     remove_msg = await message.answer("⏳ Загрузка...", reply_markup=types.ReplyKeyboardRemove())
     await remove_msg.delete()
 
     await message.answer(
-        f"✅ Запись подтверждена!\n\nУслуга: {service}\n📅 Дата: {date}\n⏰ Время: {time}\n📞 Телефон: {phone}\n\nЖдем вас!",
+        result_text,
         reply_markup=keyboards.get_main_menu(is_admin=is_admin, is_master=is_master),
     )
-
-    msg_text = f"🔔 НОВАЯ ЗАПИСЬ!\n\n👤 Клиент: {full_name_service}\n📞 Тел: {phone}\n📅 Дата: {date}\n⏰ Время: {time}"
-    admin_id = getenv("ADMIN_ID")
-    if admin_id:
-        try:
-            await message.bot.send_message(admin_id, msg_text)
-        except Exception:
-            pass
-
-    if master_id:
-        try:
-            master = await database.get_master_by_id(master_id)
-            if master and master.get("telegram_id"):
-                await message.bot.send_message(master["telegram_id"], msg_text)
-        except Exception:
-            pass
 
 
 def format_user_booking_text(name: str, phone: str, date: str, time: str) -> str:

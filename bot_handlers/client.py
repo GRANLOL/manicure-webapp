@@ -102,6 +102,14 @@ async def handle_portfolio(message: types.Message):
         
     await message.answer(caption, parse_mode="HTML")
 
+
+@router.message(F.text == "🌸 Записаться")
+async def launch_booking_webapp(message: types.Message):
+    await message.answer(
+        "Нажмите кнопку ниже, чтобы открыть запись.",
+        reply_markup=keyboards.get_booking_launch_keyboard(),
+    )
+
 @router.message(F.web_app_data)
 async def process_web_app_data(message: types.Message, state: FSMContext):
     try:

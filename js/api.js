@@ -14,6 +14,11 @@ function getApiHeaders() {
         headers['X-Telegram-Init-Data'] = tg.initData;
     }
 
+    console.info('WebApp API headers prepared:', {
+        hasInitDataHeader: Boolean(headers['X-Telegram-Init-Data']),
+        initDataLength: headers['X-Telegram-Init-Data'] ? headers['X-Telegram-Init-Data'].length : 0
+    });
+
     return headers;
 }
 
