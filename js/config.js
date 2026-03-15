@@ -10,6 +10,8 @@ function resolveApiBaseUrl() {
     const apiOverride = url.searchParams.get("apiBaseUrl");
     const resetOverride = url.searchParams.get("resetApiBaseUrl");
     const isLocalHost = ["127.0.0.1", "localhost"].includes(window.location.hostname);
+    const runtimeApiBaseUrl = window.__API_BASE_URL__;
+    const isGitHubPages = window.location.hostname.endsWith("github.io");
 
     if (resetOverride === "1") {
         window.localStorage.removeItem(API_OVERRIDE_KEY);
@@ -25,7 +27,19 @@ function resolveApiBaseUrl() {
         return storedOverride;
     }
 
-    return isLocalHost ? LOCAL_API_BASE_URL : REMOTE_API_BASE_URL;
+    if (runtimeApiBaseUrl) {
+        return runtimeApiBaseUrl;
+    }
+
+    if (isLocalHost) {
+        return LOCAL_API_BASE_URL;
+    }
+
+    if (!isGitHubPages) {
+        return `${window.location.origin}/api`;
+    }
+
+    return REMOTE_API_BASE_URL;
 }
 
 export const config = {

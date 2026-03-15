@@ -27,7 +27,7 @@ app.add_middleware(
     allow_origins=allowed_origins(WEBAPP_URL),
     allow_credentials=True,
     allow_methods=["*"],
-    allow_headers=["*"],
+    allow_headers=["Content-Type", "X-Telegram-Init-Data", "ngrok-skip-browser-warning"],
 )
 
 

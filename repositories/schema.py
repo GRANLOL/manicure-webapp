@@ -12,6 +12,7 @@ async def init_db():
                 name TEXT,
                 phone TEXT,
                 date TEXT,
+                date_iso TEXT,
                 time TEXT,
                 master_id INTEGER
             )
@@ -39,6 +40,10 @@ async def init_db():
             pass
         try:
             await db.execute("ALTER TABLE bookings ADD COLUMN master_id INTEGER")
+        except aiosqlite.OperationalError:
+            pass
+        try:
+            await db.execute("ALTER TABLE bookings ADD COLUMN date_iso TEXT")
         except aiosqlite.OperationalError:
             pass
         try:
@@ -75,4 +80,15 @@ async def init_db():
                 category_id INTEGER
             )
         """)
+        await db.execute("""
+            UPDATE bookings
+            SET date_iso = substr(date, 7, 4) || '-' || substr(date, 4, 2) || '-' || substr(date, 1, 2)
+            WHERE date_iso IS NULL
+              AND length(date) = 10
+              AND substr(date, 3, 1) = '.'
+              AND substr(date, 6, 1) = '.'
+        """)
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_bookings_date_master_time ON bookings(date, master_id, time)")
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_bookings_date_iso_time ON bookings(date_iso, time)")
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_bookings_user_id ON bookings(user_id)")
         await db.commit()

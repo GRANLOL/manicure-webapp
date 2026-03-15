@@ -30,3 +30,8 @@ def _parse_booking_date(value: str):
         return datetime.strptime(value, "%d.%m.%Y").date()
     except ValueError:
         return None
+
+
+def _to_iso_date(value: str) -> str | None:
+    parsed = _parse_booking_date(value)
+    return parsed.isoformat() if parsed else None

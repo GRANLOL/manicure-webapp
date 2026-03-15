@@ -1,10 +1,13 @@
 from os import getenv
 from html import escape
+import logging
 
 from aiogram import types
 
 import database
 import keyboards
+
+logger = logging.getLogger(__name__)
 
 
 async def create_booking_and_notify(
@@ -49,7 +52,7 @@ async def create_booking_and_notify(
         try:
             await bot.send_message(admin_id, msg_text)
         except Exception:
-            pass
+            logger.exception("Failed to send booking notification to admin", extra={"admin_id": admin_id})
 
     if master_id and bot is not None:
         try:
@@ -57,7 +60,7 @@ async def create_booking_and_notify(
             if master and master.get("telegram_id"):
                 await bot.send_message(master["telegram_id"], msg_text)
         except Exception:
-            pass
+            logger.exception("Failed to send booking notification to master", extra={"master_id": master_id})
 
     return True, (
         f"✅ Запись подтверждена!\n\n"
@@ -132,7 +135,7 @@ async def cancel_booking_and_notify(callback: types.CallbackQuery, *, booking_id
         try:
             await callback.bot.send_message(admin_id, msg_text)
         except Exception:
-            pass
+            logger.exception("Failed to send cancellation notification to admin", extra={"admin_id": admin_id})
 
     if master_id:
         try:
@@ -140,4 +143,4 @@ async def cancel_booking_and_notify(callback: types.CallbackQuery, *, booking_id
             if master and master.get("telegram_id"):
                 await callback.bot.send_message(master["telegram_id"], msg_text)
         except Exception:
-            pass
+            logger.exception("Failed to send cancellation notification to master", extra={"master_id": master_id})

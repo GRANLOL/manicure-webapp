@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-from .base import _slot_overlaps, _time_to_minutes, aiosqlite, datetime
+from .base import _slot_overlaps, _time_to_minutes, _to_iso_date, aiosqlite, datetime
 
 async def add_booking(user_id, name, phone, date, time, master_id=None, duration=60, service_name=None, price=0):
+    date_iso = _to_iso_date(date)
     async with aiosqlite.connect("bookings.db") as db:
         await db.execute(
-            "INSERT INTO bookings (user_id, name, phone, date, time, master_id, duration, service_name, price) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            (user_id, name, phone, date, time, master_id, duration, service_name, price)
+            "INSERT INTO bookings (user_id, name, phone, date, date_iso, time, master_id, duration, service_name, price) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (user_id, name, phone, date, date_iso, time, master_id, duration, service_name, price)
         )
         await db.commit()
 
@@ -22,6 +23,7 @@ async def create_booking_if_available(
     price=0,
 ):
     slot_start = _time_to_minutes(time)
+    date_iso = _to_iso_date(date)
     if slot_start is None:
         return False
 
@@ -48,8 +50,8 @@ async def create_booking_if_available(
                 return False
 
         await db.execute(
-            "INSERT INTO bookings (user_id, name, phone, date, time, master_id, duration, service_name, price) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            (user_id, name, phone, date, time, master_id, duration, service_name, price),
+            "INSERT INTO bookings (user_id, name, phone, date, date_iso, time, master_id, duration, service_name, price) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (user_id, name, phone, date, date_iso, time, master_id, duration, service_name, price),
         )
         await db.commit()
         return True
@@ -90,7 +92,7 @@ async def get_all_bookings():
             SELECT b.name, b.phone, b.date, b.time, m.name 
             FROM bookings b 
             LEFT JOIN masters m ON b.master_id = m.id 
-            ORDER BY b.date, b.time
+            ORDER BY COALESCE(b.date_iso, b.date), b.time
         """) as cursor:
             return await cursor.fetchall()
 
@@ -112,7 +114,7 @@ async def get_bookings_by_date_full(target_date: str):
 
 async def get_bookings_by_master(master_id: int):
     async with aiosqlite.connect("bookings.db") as db:
-        async with db.execute("SELECT name, phone, date, time FROM bookings WHERE master_id = ? ORDER BY date, time", (master_id,)) as cursor:
+        async with db.execute("SELECT name, phone, date, time FROM bookings WHERE master_id = ? ORDER BY COALESCE(date_iso, date), time", (master_id,)) as cursor:
             return await cursor.fetchall()
 
 async def get_bookings_by_master_and_date(master_id: int, target_date: str):
@@ -203,29 +205,24 @@ async def delete_bookings_by_date(target_date: str):
 
 async def delete_bookings_by_period(start_date: str, end_date: str):
     try:
-        start = datetime.strptime(start_date, "%d.%m.%Y").date()
-        end = datetime.strptime(end_date, "%d.%m.%Y").date()
+        start_iso = datetime.strptime(start_date, "%d.%m.%Y").date().isoformat()
+        end_iso = datetime.strptime(end_date, "%d.%m.%Y").date().isoformat()
     except ValueError:
         return 0
 
     async with aiosqlite.connect("bookings.db") as db:
-        async with db.execute("SELECT id, date FROM bookings") as cursor:
-            rows = await cursor.fetchall()
-            
-        ids_to_delete = []
-        for r_id, r_date in rows:
-            try:
-                d = datetime.strptime(r_date, "%d.%m.%Y").date()
-                if start <= d <= end:
-                    ids_to_delete.append(r_id)
-            except ValueError:
-                pass
-                
-        if ids_to_delete:
-            placeholders = ",".join("?" for _ in ids_to_delete)
-            await db.execute(f"DELETE FROM bookings WHERE id IN ({placeholders})", ids_to_delete)
+        async with db.execute(
+            "SELECT COUNT(id) FROM bookings WHERE date_iso IS NOT NULL AND date_iso BETWEEN ? AND ?",
+            (start_iso, end_iso),
+        ) as cursor:
+            count = (await cursor.fetchone())[0]
+        if count > 0:
+            await db.execute(
+                "DELETE FROM bookings WHERE date_iso IS NOT NULL AND date_iso BETWEEN ? AND ?",
+                (start_iso, end_iso),
+            )
             await db.commit()
-        return len(ids_to_delete)
+        return count
 
 async def delete_bookings_by_master(master_id: int):
     async with aiosqlite.connect("bookings.db") as db:
@@ -237,25 +234,17 @@ async def delete_bookings_by_master(master_id: int):
         return count
 
 async def delete_past_bookings():
-    today = datetime.now().date()
+    today_iso = datetime.now().date().isoformat()
     async with aiosqlite.connect("bookings.db") as db:
-        async with db.execute("SELECT id, date FROM bookings") as cursor:
-            rows = await cursor.fetchall()
-            
-        ids_to_delete = []
-        for r_id, r_date in rows:
-            try:
-                d = datetime.strptime(r_date, "%d.%m.%Y").date()
-                if d < today:
-                    ids_to_delete.append(r_id)
-            except ValueError:
-                pass
-                
-        if ids_to_delete:
-            placeholders = ",".join("?" for _ in ids_to_delete)
-            await db.execute(f"DELETE FROM bookings WHERE id IN ({placeholders})", ids_to_delete)
+        async with db.execute(
+            "SELECT COUNT(id) FROM bookings WHERE date_iso IS NOT NULL AND date_iso < ?",
+            (today_iso,),
+        ) as cursor:
+            count = (await cursor.fetchone())[0]
+        if count > 0:
+            await db.execute("DELETE FROM bookings WHERE date_iso IS NOT NULL AND date_iso < ?", (today_iso,))
             await db.commit()
-        return len(ids_to_delete)
+        return count
 
 async def get_all_busy_slots(master_id: int | None = None):
     from collections import defaultdict
