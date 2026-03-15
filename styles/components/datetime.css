@@ -89,13 +89,12 @@
 /* Date Off / Full States */
 .date-off,
 .date-full {
-    background: rgba(255, 248, 244, 0.58);
-    color: rgba(91, 58, 45, 0.46);
-    box-shadow: 0 14px 28px rgba(83, 43, 25, 0.08);
+    background: rgba(255, 255, 255, 0.08);
+    color: rgba(255, 255, 255, 0.34);
+    box-shadow: none;
     cursor: not-allowed;
-    border-color: rgba(255, 255, 255, 0.55);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
+    border-color: rgba(255, 255, 255, 0.08);
+    filter: saturate(0.72);
 }
 
 .date-off:active,
