@@ -247,7 +247,7 @@ async def cancel_admin_action_callback(callback: types.CallbackQuery, state):
     if not admin_id or str(callback.from_user.id) != admin_id:
         return
     await state.clear()
-    await callback.message.edit_text("Действие отменено.", reply_markup=keyboards.get_back_to_admin_menu_keyboard())
+    await callback.message.delete()
 
 
 @router.message(Command("export_excel"))
@@ -319,6 +319,15 @@ async def booking_actions_callback(callback: types.CallbackQuery):
         parse_mode="HTML",
         reply_markup=keyboards.get_admin_booking_actions_keyboard(booking_id, phone, context, int(page_str)),
     )
+
+
+@router.callback_query(F.data.startswith("show_phone_"))
+async def show_phone_callback(callback: types.CallbackQuery):
+    admin_id = getenv("ADMIN_ID")
+    if not admin_id or str(callback.from_user.id) != admin_id:
+        return
+    phone = callback.data.replace("show_phone_", "", 1)
+    await callback.answer(f"Номер: +{phone}", show_alert=True)
 
 
 @router.callback_query(F.data.startswith("admin_cancel_booking_"))

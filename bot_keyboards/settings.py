@@ -29,7 +29,7 @@ def get_working_days_keyboard(working_days, blacklisted_dates=None):
     builder.row(InlineKeyboardButton(text="🚫 Блокировки времени", callback_data="manage_blocked_slots"))
     for date_str in blacklisted_dates:
         builder.row(InlineKeyboardButton(text=f"❌ Удалить выходной {date_str}", callback_data=f"del_bl_{date_str}"))
-    builder.row(InlineKeyboardButton(text="◀️ Назад в настройки", callback_data="back_to_settings"))
+    builder.row(InlineKeyboardButton(text="❌ Отмена", callback_data="cancel_admin_action"))
     return builder.as_markup()
 
 
@@ -42,7 +42,7 @@ def get_system_settings_keyboard(_use_masters: bool = False):
     builder.row(InlineKeyboardButton(text="🕒 Часы работы", callback_data="settings_working_hours"))
     builder.row(InlineKeyboardButton(text="⏳ Шаг записи", callback_data="settings_interval"))
     builder.row(InlineKeyboardButton(text=f"💱 Валюта: {salon_config.get('currency_symbol', '₸')}", callback_data="settings_currency"))
-    builder.row(InlineKeyboardButton(text="◀️ Назад в меню", callback_data="back_to_admin_menu"))
+    builder.row(InlineKeyboardButton(text="❌ Отмена", callback_data="cancel_admin_action"))
     return builder.as_markup()
 
 
@@ -54,6 +54,7 @@ def get_reminder_settings_keyboard():
     builder.row(InlineKeyboardButton(text="✏️ Текст второго уведомления", callback_data="edit_rem_text_2"))
     builder.row(InlineKeyboardButton(text="🕒 Время второго уведомления", callback_data="edit_rem_time_2"))
     builder.row(InlineKeyboardButton(text="◀️ Назад в настройки", callback_data="back_to_settings"))
+    builder.row(InlineKeyboardButton(text="❌ Отмена", callback_data="cancel_admin_action"))
     return builder.as_markup()
 
 
@@ -90,6 +91,7 @@ def get_currency_keyboard():
         builder.row(InlineKeyboardButton(text=f"Выбрать {symbol}", callback_data=f"set_currency_{symbol}"))
     builder.row(InlineKeyboardButton(text="⌨️ Ввести вручную", callback_data="set_currency_custom"))
     builder.row(InlineKeyboardButton(text="◀️ Назад в настройки", callback_data="back_to_settings"))
+    builder.row(InlineKeyboardButton(text="❌ Отмена", callback_data="cancel_admin_action"))
     return builder.as_markup()
 
 
@@ -106,4 +108,5 @@ def get_blocked_slots_keyboard(blocked_slots):
             )
         )
     builder.row(InlineKeyboardButton(text="◀️ Назад к графику", callback_data="back_to_schedule"))
+    builder.row(InlineKeyboardButton(text="❌ Отмена", callback_data="cancel_admin_action"))
     return builder.as_markup()

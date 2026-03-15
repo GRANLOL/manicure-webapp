@@ -12,6 +12,13 @@ def _normalize_phone(phone: str) -> str:
     return digits
 
 
+def _short_name(name: str, limit: int = 18) -> str:
+    value = (name or "").strip()
+    if len(value) <= limit:
+        return value
+    return value[: limit - 1].rstrip() + "…"
+
+
 def get_cancel_keyboard(user_id: int, booking_id: int | None = None):
     callback_data = f"cancel_{user_id}_{booking_id}" if booking_id is not None else f"cancel_{user_id}"
     return InlineKeyboardMarkup(
@@ -86,6 +93,7 @@ def get_analytics_keyboard():
     builder.row(InlineKeyboardButton(text="📅 Сегодня", callback_data="stats_today"))
     builder.row(InlineKeyboardButton(text="📆 За 7 дней", callback_data="stats_week"))
     builder.row(InlineKeyboardButton(text="🗓 За 30 дней", callback_data="stats_month"))
+    builder.row(InlineKeyboardButton(text="❌ Отмена", callback_data="cancel_admin_action"))
     return builder.as_markup()
 
 
@@ -93,8 +101,16 @@ def get_admin_booking_page_keyboard(bookings, context: str, page: int, total_pag
     from aiogram.utils.keyboard import InlineKeyboardBuilder
 
     builder = InlineKeyboardBuilder()
-    for booking_id, *_rest in bookings:
-        builder.row(InlineKeyboardButton(text=f"Действия по записи #{booking_id}", callback_data=f"booking_actions_{context}_{page}_{booking_id}"))
+    for booking_id, name, _phone, date, time, _price in bookings:
+        label = f"{time} • {_short_name(name)}"
+        if context == "all":
+            label = f"{date} • {_short_name(name)}"
+        builder.row(
+            InlineKeyboardButton(
+                text=label,
+                callback_data=f"booking_actions_{context}_{page}_{booking_id}",
+            )
+        )
 
     nav = []
     if page > 0:
@@ -104,7 +120,7 @@ def get_admin_booking_page_keyboard(bookings, context: str, page: int, total_pag
     if nav:
         builder.row(*nav)
 
-    builder.row(InlineKeyboardButton(text="◀️ Назад в меню", callback_data="back_to_admin_menu"))
+    builder.row(InlineKeyboardButton(text="❌ Отмена", callback_data="cancel_admin_action"))
     return builder.as_markup()
 
 
@@ -116,7 +132,7 @@ def get_admin_booking_actions_keyboard(booking_id: int, phone: str, context: str
     if digits:
         builder.row(
             InlineKeyboardButton(text="💬 Написать", url=f"https://wa.me/{digits}"),
-            InlineKeyboardButton(text="📞 Позвонить", url=f"tel:+{digits}"),
+            InlineKeyboardButton(text="📞 Показать номер", callback_data=f"show_phone_{digits}"),
         )
     builder.row(InlineKeyboardButton(text="❌ Отменить запись", callback_data=f"admin_cancel_booking_{booking_id}_{context}_{page}"))
     builder.row(InlineKeyboardButton(text="◀️ Назад к списку", callback_data=f"bookings_page_{context}_{page}"))
