@@ -120,6 +120,33 @@ def format_user_booking_text(name: str, phone: str, date: str, time: str, status
     )
 
 
+def format_booking_history_text(bookings: list[tuple[str, str, str, str, str]]) -> str:
+    lines = [
+        "🕘 <b>История</b>",
+        "",
+        "Последние завершённые и отменённые записи:",
+        "",
+    ]
+
+    for index, (name, date, time, status, phone) in enumerate(bookings, start=1):
+        safe_name = escape(name)
+        safe_date = escape(date)
+        safe_time = escape(time)
+        safe_phone = escape(phone)
+        safe_status = escape(get_booking_status_label(status))
+        lines.extend(
+            [
+                f"<b>{index}. {safe_name}</b>",
+                f"Статус: {safe_status}",
+                f"Дата: {safe_date} в {safe_time}",
+                f"Телефон: {safe_phone}",
+                "",
+            ]
+        )
+
+    return "\n".join(lines).rstrip()
+
+
 async def cancel_booking_and_notify(
     callback: types.CallbackQuery,
     *,

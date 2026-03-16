@@ -12,6 +12,7 @@ from .base import (
     cancel_booking_and_notify,
     database,
     finalize_web_booking,
+    format_booking_history_text,
     format_user_booking_text,
     getenv,
     keyboards,
@@ -171,11 +172,14 @@ async def my_bookings_handler(message: types.Message):
     active_bookings = [booking for booking in bookings if booking[5] == "scheduled"]
     history_bookings = [booking for booking in bookings if booking[5] != "scheduled"][:USER_HISTORY_LIMIT]
 
+    summary_lines = ["📋 <b>Мои записи</b>", ""]
+    summary_lines.append(f"📌 Активные: <b>{len(active_bookings)}</b>")
+    summary_lines.append(f"🕘 История: <b>{len([booking for booking in bookings if booking[5] != 'scheduled'])}</b>")
     if active_bookings:
-        await message.answer(
-            "📌 <b>Активные записи</b>\n\nЗдесь собраны предстоящие визиты. Их можно отменить прямо из кабинета.",
-            parse_mode="HTML",
-        )
+        summary_lines.extend(["", "Предстоящие визиты можно отменить прямо из кабинета."])
+    elif history_bookings:
+        summary_lines.extend(["", "Сейчас активных записей нет, ниже сохранена история посещений."])
+    await message.answer("\n".join(summary_lines), parse_mode="HTML")
 
     for booking_id, name, phone, date, time, status in active_bookings:
         await message.answer(
@@ -185,15 +189,14 @@ async def my_bookings_handler(message: types.Message):
         )
 
     if history_bookings:
-        history_title = "🕘 <b>История</b>\n\nЗдесь сохраняются последние завершённые и отменённые записи."
-        if len(bookings) - len(active_bookings) > USER_HISTORY_LIMIT:
-            history_title += f"\n<i>Показаны последние {USER_HISTORY_LIMIT} записей.</i>"
-        await message.answer(history_title, parse_mode="HTML")
-
-    for _booking_id, name, phone, date, time, status in history_bookings:
         await message.answer(
-            format_user_booking_text(name, phone, date, time, status=status),
-            reply_markup=None,
+            format_booking_history_text(
+                [(name, date, time, status, phone) for _booking_id, name, phone, date, time, status in history_bookings]
+            ) + (
+                f"\n\n<i>Показаны последние {USER_HISTORY_LIMIT} записей.</i>"
+                if len(bookings) - len(active_bookings) > USER_HISTORY_LIMIT
+                else ""
+            ),
             parse_mode="HTML",
         )
 

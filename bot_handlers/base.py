@@ -15,7 +15,12 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import FSInputFile
 
 from analytics_service import build_stats_report as build_analytics_report
-from booking_service import cancel_booking_and_notify, finalize_web_booking, format_user_booking_text
+from booking_service import (
+    cancel_booking_and_notify,
+    finalize_web_booking,
+    format_booking_history_text,
+    format_user_booking_text,
+)
 from booking_validation import validate_web_booking as service_validate_web_booking
 from category_service import build_category_list_text, filter_valid_parent_categories
 from config import salon_config, update_config
