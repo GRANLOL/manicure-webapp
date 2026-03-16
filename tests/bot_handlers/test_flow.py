@@ -15,7 +15,7 @@ class ClientFlowTests(unittest.IsolatedAsyncioTestCase):
         with patch.object(client_handlers.keyboards, "get_booking_launch_keyboard", return_value="webapp-kb"):
             await client_handlers.launch_booking_webapp(message)
 
-        message.answer.assert_awaited_once_with(ANY, reply_markup="webapp-kb")
+        message.answer.assert_awaited_once_with(ANY, parse_mode="HTML", reply_markup="webapp-kb")
 
     async def test_process_web_app_data_success_calls_finalize_and_clears_state(self):
         message = make_message(

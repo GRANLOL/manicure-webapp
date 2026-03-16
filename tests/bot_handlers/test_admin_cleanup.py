@@ -12,7 +12,7 @@ class AdminCleanupMoreTests(unittest.IsolatedAsyncioTestCase):
 
         await admin_cleanup_handlers.process_clear_date(message, state)
 
-        message.answer.assert_awaited_once_with(ANY)
+        message.answer.assert_awaited_once_with(ANY, parse_mode="HTML")
         state.clear.assert_not_awaited()
 
     async def test_process_clear_period_end_builds_confirmation(self):
@@ -24,7 +24,7 @@ class AdminCleanupMoreTests(unittest.IsolatedAsyncioTestCase):
             await admin_cleanup_handlers.process_clear_period_end(message, state)
 
         state.clear.assert_awaited_once()
-        message.answer.assert_awaited_once_with(ANY, reply_markup="kb")
+        message.answer.assert_awaited_once_with(ANY, parse_mode="HTML", reply_markup="kb")
 
     async def test_clear_bookings_handler_shows_options_for_admin(self):
         message = make_message(user_id=1)
@@ -33,7 +33,7 @@ class AdminCleanupMoreTests(unittest.IsolatedAsyncioTestCase):
              patch.object(admin_cleanup_handlers.keyboards, "get_clear_options_keyboard", return_value="kb"):
             await admin_cleanup_handlers.clear_bookings_handler(message)
 
-        message.answer.assert_awaited_once_with(ANY, reply_markup="kb")
+        message.answer.assert_awaited_once_with(ANY, parse_mode="HTML", reply_markup="kb")
 
     async def test_confirm_clear_cb_today_uses_today_date(self):
         callback = make_callback(data="confirm_clear_today", user_id=1)
@@ -47,4 +47,4 @@ class AdminCleanupMoreTests(unittest.IsolatedAsyncioTestCase):
             await admin_cleanup_handlers.confirm_clear_cb(callback)
 
         delete_mock.assert_awaited_once_with("14.03.2026")
-        callback.message.edit_text.assert_awaited_once_with(ANY)
+        callback.message.edit_text.assert_awaited_once_with(ANY, parse_mode="HTML")

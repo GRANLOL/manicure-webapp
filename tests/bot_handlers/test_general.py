@@ -12,7 +12,7 @@ class GeneralHandlerTests(unittest.IsolatedAsyncioTestCase):
         with patch.object(general_handlers, "getenv", return_value="1"):
             await general_handlers.start_handler(message)
 
-        message.answer.assert_awaited_once_with(ANY, reply_markup=general_handlers.keyboards.admin_menu)
+        message.answer.assert_awaited_once_with(ANY, parse_mode="HTML", reply_markup=general_handlers.keyboards.admin_menu)
 
     async def test_start_handler_uses_client_menu_for_regular_user(self):
         message = make_message(user_id=10)
@@ -24,8 +24,8 @@ class GeneralHandlerTests(unittest.IsolatedAsyncioTestCase):
             await general_handlers.start_handler(message)
 
         self.assertEqual(message.answer.await_count, 2)
-        message.answer.assert_any_await("hello", reply_markup="launch")
-        message.answer.assert_any_await(ANY, reply_markup="menu")
+        message.answer.assert_any_await("hello", parse_mode="HTML", reply_markup="launch")
+        message.answer.assert_any_await(ANY, parse_mode="HTML", reply_markup="menu")
 
     async def test_client_menu_handler_refreshes_launch_and_reply_keyboards(self):
         message = make_message(user_id=1, text="Меню клиента")
@@ -36,8 +36,8 @@ class GeneralHandlerTests(unittest.IsolatedAsyncioTestCase):
             await general_handlers.client_menu_handler(message)
 
         self.assertEqual(message.answer.await_count, 2)
-        message.answer.assert_any_await(ANY, reply_markup="launch")
-        message.answer.assert_any_await(ANY, reply_markup="menu")
+        message.answer.assert_any_await(ANY, parse_mode="HTML", reply_markup="launch")
+        message.answer.assert_any_await(ANY, parse_mode="HTML", reply_markup="menu")
 
     async def test_export_excel_handler_sends_document_for_admin(self):
         message = make_message(user_id=1)
@@ -50,7 +50,7 @@ class GeneralHandlerTests(unittest.IsolatedAsyncioTestCase):
             await general_handlers.export_excel_handler(message)
 
         build_mock.assert_called_once_with("bookings_export.xlsx", [("A", "B", "01.01.2026", "10:00", 2500)])
-        message.answer_document.assert_awaited_once_with("excel-file", caption=ANY)
+        message.answer_document.assert_awaited_once_with("excel-file", caption=ANY, parse_mode="HTML")
         remove_mock.assert_called_once_with("bookings_export.xlsx")
 
     async def test_booking_actions_callback_renders_status_controls(self):

@@ -35,7 +35,7 @@ def _schedule_markup():
 async def system_settings_handler(message: types.Message):
     if not _is_admin(message.from_user.id):
         return
-    await message.answer("Настройки системы:", reply_markup=keyboards.get_system_settings_keyboard())
+    await message.answer("⚙️ <b>Настройки системы</b>\n\nВыберите раздел для изменения.", parse_mode="HTML", reply_markup=keyboards.get_system_settings_keyboard())
 
 
 @router.callback_query(F.data == "back_to_settings")
@@ -43,7 +43,7 @@ async def back_to_settings_callback(callback: types.CallbackQuery):
     if not _is_admin(callback.from_user.id):
         return
     await callback.answer()
-    await callback.message.edit_text("Настройки системы:", reply_markup=keyboards.get_system_settings_keyboard())
+    await callback.message.edit_text("⚙️ <b>Настройки системы</b>\n\nВыберите раздел для изменения.", parse_mode="HTML", reply_markup=keyboards.get_system_settings_keyboard())
 
 
 @router.callback_query(F.data == "settings_reminders")
@@ -52,31 +52,31 @@ async def settings_reminders_callback(callback: types.CallbackQuery):
         return
     await callback.answer()
     text = (
-        "Настройки напоминаний:\n\n"
-        "1. Первое уведомление за 24 часа\n"
-        "2. Второе уведомление за несколько часов до записи"
+        "🔔 <b>Настройки напоминаний</b>\n\n"
+        "1. Первое уведомление отправляется за <b>24 часа</b>.\n"
+        "2. Второе уведомление отправляется за несколько часов до записи."
     )
-    await callback.message.edit_text(text, reply_markup=keyboards.get_reminder_settings_keyboard())
+    await callback.message.edit_text(text, parse_mode="HTML", reply_markup=keyboards.get_reminder_settings_keyboard())
 
 
 @router.callback_query(F.data == "edit_rem_text_1")
 async def edit_rem_text_1_cb(callback: types.CallbackQuery, state: FSMContext):
     await state.set_state(EditReminderSettingsForm.text_1)
-    await callback.message.answer("Введите новый текст для первого напоминания.", reply_markup=keyboards.get_cancel_admin_action_keyboard())
+    await callback.message.answer("Введите новый текст для <b>первого напоминания</b>.", parse_mode="HTML", reply_markup=keyboards.get_cancel_admin_action_keyboard())
     await callback.answer()
 
 
 @router.callback_query(F.data == "edit_rem_text_2")
 async def edit_rem_text_2_cb(callback: types.CallbackQuery, state: FSMContext):
     await state.set_state(EditReminderSettingsForm.text_2)
-    await callback.message.answer("Введите новый текст для второго напоминания.", reply_markup=keyboards.get_cancel_admin_action_keyboard())
+    await callback.message.answer("Введите новый текст для <b>второго напоминания</b>.", parse_mode="HTML", reply_markup=keyboards.get_cancel_admin_action_keyboard())
     await callback.answer()
 
 
 @router.callback_query(F.data == "edit_rem_time_2")
 async def edit_rem_time_2_cb(callback: types.CallbackQuery, state: FSMContext):
     await state.set_state(EditReminderSettingsForm.time_2)
-    await callback.message.answer("За сколько часов до записи отправлять второе напоминание?", reply_markup=keyboards.get_cancel_admin_action_keyboard())
+    await callback.message.answer("За сколько часов до записи отправлять <b>второе напоминание</b>?", parse_mode="HTML", reply_markup=keyboards.get_cancel_admin_action_keyboard())
     await callback.answer()
 
 
@@ -120,7 +120,8 @@ async def settings_timezone_callback(callback: types.CallbackQuery, state: FSMCo
     current_tz = salon_config.get("timezone_offset", 3)
     await state.set_state(EditTimezoneForm.offset)
     await callback.message.edit_text(
-        f"Текущее смещение: UTC{'+' if current_tz >= 0 else ''}{current_tz}\nВведите новое смещение в часах:",
+        f"🕒 <b>Часовой пояс</b>\n\nТекущее смещение: <b>UTC{'+' if current_tz >= 0 else ''}{current_tz}</b>\nВведите новое смещение в часах:",
+        parse_mode="HTML",
         reply_markup=keyboards.get_cancel_admin_action_keyboard("back_to_settings", "◀️ В настройки"),
     )
 
@@ -153,7 +154,8 @@ async def settings_currency_callback(callback: types.CallbackQuery):
     await callback.answer()
     current_symbol = get_currency_symbol()
     await callback.message.edit_text(
-        f"Текущая валюта: {current_symbol}\nВыберите символ или введите свой.",
+        f"💱 <b>Валюта</b>\n\nТекущий символ: <b>{current_symbol}</b>\nВыберите вариант ниже или введите свой.",
+        parse_mode="HTML",
         reply_markup=keyboards.get_currency_keyboard(),
     )
 
@@ -172,7 +174,7 @@ async def set_currency_callback(callback: types.CallbackQuery, state: FSMContext
         return
 
     update_config("currency_symbol", payload)
-    await callback.message.edit_text(f"✅ Валюта обновлена: {payload}", reply_markup=keyboards.get_system_settings_keyboard())
+    await callback.message.edit_text(f"✅ Валюта обновлена: <b>{payload}</b>", parse_mode="HTML", reply_markup=keyboards.get_system_settings_keyboard())
 
 
 @router.message(EditCurrencyForm.symbol)
@@ -186,7 +188,7 @@ async def process_currency_symbol(message: types.Message, state: FSMContext):
         return
     update_config("currency_symbol", symbol)
     await state.clear()
-    await message.answer(f"✅ Валюта обновлена: {symbol}", reply_markup=keyboards.get_system_settings_keyboard())
+    await message.answer(f"✅ Валюта обновлена: <b>{symbol}</b>", parse_mode="HTML", reply_markup=keyboards.get_system_settings_keyboard())
 
 
 @router.message(F.text == "🗓 График")
@@ -194,7 +196,8 @@ async def manage_schedule_handler(message: types.Message):
     if not _is_admin(message.from_user.id):
         return
     await message.answer(
-        "Настройка графика работы:\nВыберите рабочие дни и управляйте блокировками.",
+        "🗓 <b>График работы</b>\n\nВыберите рабочие дни и управляйте блокировками.",
+        parse_mode="HTML",
         reply_markup=_schedule_markup(),
     )
 
@@ -206,7 +209,8 @@ async def back_to_schedule_callback(callback: types.CallbackQuery, state: FSMCon
     await callback.answer()
     await state.clear()
     await callback.message.edit_text(
-        "Настройка графика работы:\nВыберите рабочие дни и управляйте блокировками.",
+        "🗓 <b>График работы</b>\n\nВыберите рабочие дни и управляйте блокировками.",
+        parse_mode="HTML",
         reply_markup=_schedule_markup(),
     )
 
@@ -234,7 +238,7 @@ async def add_blacklist_date_callback(callback: types.CallbackQuery, state: FSMC
     if not _is_admin(callback.from_user.id):
         return
     await state.set_state(AddBlacklistDateForm.date)
-    await callback.message.answer("Введите дату выходного в формате ДД.ММ.ГГГГ:", reply_markup=keyboards.get_cancel_admin_action_keyboard())
+    await callback.message.answer("Введите выходной день в формате <code>ДД.ММ.ГГГГ</code>.", parse_mode="HTML", reply_markup=keyboards.get_cancel_admin_action_keyboard())
     await callback.answer()
 
 
@@ -242,7 +246,7 @@ async def add_blacklist_date_callback(callback: types.CallbackQuery, state: FSMC
 async def process_blacklist_date(message: types.Message, state: FSMContext):
     date_str = message.text.strip()
     if not re.match(r"^\d{2}\.\d{2}\.\d{4}$", date_str):
-        await message.answer("Неверный формат. Используйте ДД.ММ.ГГГГ.")
+        await message.answer("Неверный формат. Используйте <code>ДД.ММ.ГГГГ</code>.", parse_mode="HTML")
         return
 
     blacklisted_dates = salon_config.get("blacklisted_dates", [])
@@ -251,7 +255,7 @@ async def process_blacklist_date(message: types.Message, state: FSMContext):
         update_config("blacklisted_dates", blacklisted_dates)
 
     await state.clear()
-    await message.answer(f"✅ Дата {date_str} добавлена в выходные.", reply_markup=_schedule_markup())
+    await message.answer(f"✅ Дата <b>{date_str}</b> добавлена в выходные.", parse_mode="HTML", reply_markup=_schedule_markup())
 
 
 @router.callback_query(F.data.startswith("del_bl_"))
@@ -275,8 +279,8 @@ async def manage_blocked_slots_callback(callback: types.CallbackQuery):
         return
     await callback.answer()
     blocked_slots = await database.get_blocked_slots()
-    text = "Блокировки времени:\n\nДобавляйте обед, технические окна и срочные ограничения."
-    await callback.message.edit_text(text, reply_markup=keyboards.get_blocked_slots_keyboard(blocked_slots))
+    text = "⛔ <b>Блокировки времени</b>\n\nЗдесь можно добавить обед, техническое окно или другое ограничение."
+    await callback.message.edit_text(text, parse_mode="HTML", reply_markup=keyboards.get_blocked_slots_keyboard(blocked_slots))
 
 
 @router.callback_query(F.data == "add_blocked_slot")
@@ -284,7 +288,7 @@ async def add_blocked_slot_callback(callback: types.CallbackQuery, state: FSMCon
     if not _is_admin(callback.from_user.id):
         return
     await state.set_state(AddBlockedSlotForm.date)
-    await callback.message.answer("Введите дату блокировки в формате ДД.ММ.ГГГГ:", reply_markup=keyboards.get_cancel_admin_action_keyboard())
+    await callback.message.answer("Введите дату блокировки в формате <code>ДД.ММ.ГГГГ</code>.", parse_mode="HTML", reply_markup=keyboards.get_cancel_admin_action_keyboard())
     await callback.answer()
 
 
@@ -293,13 +297,14 @@ async def process_blocked_slot_date(message: types.Message, state: FSMContext):
     value = message.text.strip()
     if not re.match(r"^\d{2}\.\d{2}\.\d{4}$", value):
         await message.answer(
-            "Неверный формат даты. Используйте ДД.ММ.ГГГГ.",
+            "Неверный формат даты. Используйте <code>ДД.ММ.ГГГГ</code>.",
+            parse_mode="HTML",
             reply_markup=keyboards.get_cancel_admin_action_keyboard("back_to_schedule", "◀️ К графику"),
         )
         return
     await state.update_data(date=value)
     await state.set_state(AddBlockedSlotForm.start_time)
-    await message.answer("Введите время начала в формате ЧЧ:ММ:")
+    await message.answer("Введите время <b>начала</b> в формате <code>ЧЧ:ММ</code>.", parse_mode="HTML")
 
 
 @router.message(AddBlockedSlotForm.start_time)
@@ -307,13 +312,14 @@ async def process_blocked_slot_start(message: types.Message, state: FSMContext):
     value = message.text.strip()
     if not re.match(r"^\d{2}:\d{2}$", value):
         await message.answer(
-            "Неверный формат времени. Используйте ЧЧ:ММ.",
+            "Неверный формат времени. Используйте <code>ЧЧ:ММ</code>.",
+            parse_mode="HTML",
             reply_markup=keyboards.get_cancel_admin_action_keyboard("back_to_schedule", "◀️ К графику"),
         )
         return
     await state.update_data(start_time=value)
     await state.set_state(AddBlockedSlotForm.end_time)
-    await message.answer("Введите время окончания в формате ЧЧ:ММ:")
+    await message.answer("Введите время <b>окончания</b> в формате <code>ЧЧ:ММ</code>.", parse_mode="HTML")
 
 
 @router.message(AddBlockedSlotForm.end_time)
@@ -321,7 +327,8 @@ async def process_blocked_slot_end(message: types.Message, state: FSMContext):
     value = message.text.strip()
     if not re.match(r"^\d{2}:\d{2}$", value):
         await message.answer(
-            "Неверный формат времени. Используйте ЧЧ:ММ.",
+            "Неверный формат времени. Используйте <code>ЧЧ:ММ</code>.",
+            parse_mode="HTML",
             reply_markup=keyboards.get_cancel_admin_action_keyboard("back_to_schedule", "◀️ К графику"),
         )
         return
@@ -340,7 +347,7 @@ async def process_blocked_slot_end(message: types.Message, state: FSMContext):
         return
     await state.update_data(end_time=value)
     await state.set_state(AddBlockedSlotForm.reason)
-    await message.answer("Введите причину блокировки или отправьте '-' если без причины:")
+    await message.answer("Введите причину блокировки или отправьте <code>-</code>, если без причины.", parse_mode="HTML")
 
 
 @router.message(AddBlockedSlotForm.reason)
@@ -356,7 +363,8 @@ async def process_blocked_slot_reason(message: types.Message, state: FSMContext)
     await state.clear()
     blocked_slots = await database.get_blocked_slots()
     await message.answer(
-        f"✅ Блокировка добавлена: {data['date']} {data['start_time']}-{data['end_time']}",
+        f"✅ Блокировка добавлена: <b>{data['date']}</b> {data['start_time']}-{data['end_time']}",
+        parse_mode="HTML",
         reply_markup=keyboards.get_blocked_slots_keyboard(blocked_slots),
     )
 
@@ -379,7 +387,8 @@ async def edit_booking_window_handler(message: types.Message, state: FSMContext)
     current_window = salon_config.get("booking_window", 7)
     await state.set_state(AddBookingWindowForm.days)
     await message.answer(
-        f"Текущее окно бронирования: {current_window} дней.\nВведите новое значение:",
+        f"📆 Текущее окно бронирования: <b>{current_window}</b> дней.\nВведите новое значение:",
+        parse_mode="HTML",
         reply_markup=keyboards.get_cancel_admin_action_keyboard(),
     )
 
@@ -392,7 +401,7 @@ async def process_booking_window(message: types.Message, state: FSMContext):
             raise ValueError
     except ValueError:
         await message.answer(
-            "Пожалуйста, введите корректное число от 1 до 365.",
+            "Пожалуйста, введите число от 1 до 365.",
             reply_markup=keyboards.get_cancel_admin_action_keyboard("back_to_settings", "◀️ В настройки"),
         )
         return
@@ -408,7 +417,8 @@ async def settings_working_hours_cb(callback: types.CallbackQuery, state: FSMCon
     current_wh = salon_config.get("working_hours", "10:00-20:00")
     await state.set_state(WorkingHoursForm.hours)
     await callback.message.edit_text(
-        f"Текущие часы работы: {current_wh}\nВведите новые часы в формате ЧЧ:ММ-ЧЧ:ММ:",
+        f"🕘 <b>Часы работы</b>\n\nТекущее значение: <b>{current_wh}</b>\nВведите новое в формате <code>ЧЧ:ММ-ЧЧ:ММ</code>.",
+        parse_mode="HTML",
         reply_markup=keyboards.get_cancel_admin_action_keyboard("back_to_settings", "◀️ В настройки"),
     )
 
@@ -418,7 +428,8 @@ async def process_working_hours(message: types.Message, state: FSMContext):
     wh = message.text.strip()
     if not re.match(r"^\d{2}:\d{2}-\d{2}:\d{2}$", wh):
         await message.answer(
-            "Неверный формат. Используйте ЧЧ:ММ-ЧЧ:ММ.",
+            "Неверный формат. Используйте <code>ЧЧ:ММ-ЧЧ:ММ</code>.",
+            parse_mode="HTML",
             reply_markup=keyboards.get_cancel_admin_action_keyboard("back_to_settings", "◀️ В настройки"),
         )
         return
@@ -434,7 +445,8 @@ async def settings_interval_cb(callback: types.CallbackQuery, state: FSMContext)
     current_interval = salon_config.get("schedule_interval", 30)
     await state.set_state(ScheduleIntervalForm.interval)
     await callback.message.edit_text(
-        f"Текущий шаг записи: {current_interval} мин.\nВведите новый интервал в минутах:",
+        f"⏱ <b>Шаг записи</b>\n\nТекущий интервал: <b>{current_interval}</b> мин.\nВведите новое значение в минутах:",
+        parse_mode="HTML",
         reply_markup=keyboards.get_cancel_admin_action_keyboard("back_to_settings", "◀️ В настройки"),
     )
 

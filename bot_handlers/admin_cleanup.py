@@ -16,7 +16,8 @@ async def clear_bookings_handler(message: types.Message):
         return
 
     await message.answer(
-        "Выберите, какие записи вы хотите очистить:",
+        "🗑 <b>Очистка записей</b>\n\nВыберите, какие записи нужно удалить.",
+        parse_mode="HTML",
         reply_markup=keyboards.get_clear_options_keyboard(),
     )
 
@@ -27,7 +28,8 @@ async def clear_today_cb(callback: types.CallbackQuery):
     if not admin_id or str(callback.from_user.id) != admin_id:
         return
     await callback.message.edit_text(
-        "Вы уверены, что хотите удалить ВСЕ записи на сегодня?",
+        "⚠️ <b>Подтверждение</b>\n\nУдалить <b>все записи за сегодня</b>?",
+        parse_mode="HTML",
         reply_markup=keyboards.get_confirm_clear_keyboard("today"),
     )
 
@@ -38,7 +40,8 @@ async def clear_past_cb(callback: types.CallbackQuery):
     if not admin_id or str(callback.from_user.id) != admin_id:
         return
     await callback.message.edit_text(
-        "Вы уверены, что хотите удалить все прошедшие записи (до сегодняшнего дня)?",
+        "⚠️ <b>Подтверждение</b>\n\nУдалить все <b>прошедшие записи</b>?",
+        parse_mode="HTML",
         reply_markup=keyboards.get_confirm_clear_keyboard("past"),
     )
 
@@ -49,7 +52,8 @@ async def clear_all_cb(callback: types.CallbackQuery):
     if not admin_id or str(callback.from_user.id) != admin_id:
         return
     await callback.message.edit_text(
-        "Вы уверены, что хотите удалить абсолютно ВСЕ записи из базы данных?",
+        "⚠️ <b>Подтверждение</b>\n\nУдалить <b>все записи</b> из базы?",
+        parse_mode="HTML",
         reply_markup=keyboards.get_confirm_clear_keyboard("all"),
     )
 
@@ -61,7 +65,8 @@ async def clear_date_cb(callback: types.CallbackQuery, state: FSMContext):
         return
     await state.set_state(ClearBookingsForm.waiting_for_date)
     await callback.message.edit_text(
-        "Введите дату для очистки в формате ДД.ММ.ГГГГ:",
+        "📅 <b>Очистка по дате</b>\n\nВведите дату в формате <code>ДД.ММ.ГГГГ</code>.",
+        parse_mode="HTML",
         reply_markup=keyboards.get_cancel_admin_action_keyboard(),
     )
 
@@ -70,11 +75,12 @@ async def clear_date_cb(callback: types.CallbackQuery, state: FSMContext):
 async def process_clear_date(message: types.Message, state: FSMContext):
     date_str = message.text.strip()
     if not re.match(r"^\d{2}\.\d{2}\.\d{4}$", date_str):
-        await message.answer("Неверный формат. Пожалуйста, введите дату в формате ДД.ММ.ГГГГ:")
+        await message.answer("Неверный формат. Используйте <code>ДД.ММ.ГГГГ</code>.", parse_mode="HTML")
         return
     await state.clear()
     await message.answer(
-        f"Вы уверены, что хотите удалить все записи за {date_str}?",
+        f"⚠️ <b>Подтверждение</b>\n\nУдалить все записи за <b>{date_str}</b>?",
+        parse_mode="HTML",
         reply_markup=keyboards.get_confirm_clear_keyboard("date", date_str),
     )
 
@@ -86,7 +92,8 @@ async def clear_period_cb(callback: types.CallbackQuery, state: FSMContext):
         return
     await state.set_state(ClearBookingsForm.waiting_for_period_start)
     await callback.message.edit_text(
-        "Введите НАЧАЛЬНУЮ дату периода в формате ДД.ММ.ГГГГ:",
+        "📆 <b>Очистка по периоду</b>\n\nВведите <b>начальную дату</b> в формате <code>ДД.ММ.ГГГГ</code>.",
+        parse_mode="HTML",
         reply_markup=keyboards.get_cancel_admin_action_keyboard(),
     )
 
@@ -95,12 +102,13 @@ async def clear_period_cb(callback: types.CallbackQuery, state: FSMContext):
 async def process_clear_period_start(message: types.Message, state: FSMContext):
     start_str = message.text.strip()
     if not re.match(r"^\d{2}\.\d{2}\.\d{4}$", start_str):
-        await message.answer("Неверный формат. Пожалуйста, введите начальную дату в формате ДД.ММ.ГГГГ:")
+        await message.answer("Неверный формат. Введите начальную дату в формате <code>ДД.ММ.ГГГГ</code>.", parse_mode="HTML")
         return
     await state.update_data(clear_start=start_str)
     await state.set_state(ClearBookingsForm.waiting_for_period_end)
     await message.answer(
-        f"Начальная дата: {start_str}\nТеперь введите КОНЕЧНУЮ дату в формате ДД.ММ.ГГГГ:",
+        f"📆 <b>Начальная дата:</b> {start_str}\n\nТеперь введите <b>конечную дату</b> в формате <code>ДД.ММ.ГГГГ</code>.",
+        parse_mode="HTML",
         reply_markup=keyboards.get_cancel_admin_action_keyboard(),
     )
 
@@ -109,7 +117,7 @@ async def process_clear_period_start(message: types.Message, state: FSMContext):
 async def process_clear_period_end(message: types.Message, state: FSMContext):
     end_str = message.text.strip()
     if not re.match(r"^\d{2}\.\d{2}\.\d{4}$", end_str):
-        await message.answer("Неверный формат. Пожалуйста, введите конечную дату в формате ДД.ММ.ГГГГ:")
+        await message.answer("Неверный формат. Введите конечную дату в формате <code>ДД.ММ.ГГГГ</code>.", parse_mode="HTML")
         return
     data = await state.get_data()
     start_str = data.get("clear_start")
@@ -117,7 +125,8 @@ async def process_clear_period_end(message: types.Message, state: FSMContext):
 
     payload = f"{start_str}-{end_str}"
     await message.answer(
-        f"Вы уверены, что хотите удалить все записи с {start_str} по {end_str}?",
+        f"⚠️ <b>Подтверждение</b>\n\nУдалить все записи с <b>{start_str}</b> по <b>{end_str}</b>?",
+        parse_mode="HTML",
         reply_markup=keyboards.get_confirm_clear_keyboard("period", payload),
     )
 
@@ -136,21 +145,21 @@ async def confirm_clear_cb(callback: types.CallbackQuery):
     if action == "today":
         today_str = datetime.now().strftime("%d.%m.%Y")
         deleted = await database.delete_bookings_by_date(today_str)
-        text = f"✅ Успешно удалено {deleted} записей за сегодня ({today_str})."
+        text = f"✅ Удалено <b>{deleted}</b> записей за <b>{today_str}</b>."
     elif action == "past":
         deleted = await database.delete_past_bookings()
-        text = f"✅ Успешно удалено {deleted} старых записей."
+        text = f"✅ Удалено <b>{deleted}</b> прошедших записей."
     elif action == "all":
         await database.clear_bookings()
-        text = "✅ База данных полностью очищена от записей."
+        text = "✅ Все записи удалены из базы."
     elif action == "date":
         deleted = await database.delete_bookings_by_date(payload)
-        text = f"✅ Успешно удалено {deleted} записей за {payload}."
+        text = f"✅ Удалено <b>{deleted}</b> записей за <b>{payload}</b>."
     elif action == "period":
         start_str, end_str = payload.split("-")
         deleted = await database.delete_bookings_by_period(start_str, end_str)
-        text = f"✅ Успешно удалено {deleted} записей в периоде с {start_str} по {end_str}."
+        text = f"✅ Удалено <b>{deleted}</b> записей за период с <b>{start_str}</b> по <b>{end_str}</b>."
     else:
-        text = "Произошла ошибка, неизвестное действие."
+        text = "Произошла ошибка: неизвестное действие."
 
-    await callback.message.edit_text(text)
+    await callback.message.edit_text(text, parse_mode="HTML")

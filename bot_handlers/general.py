@@ -161,15 +161,27 @@ def _paginate(items, page: int, page_size: int = BOOKINGS_PAGE_SIZE):
 
 def _render_booking_page(bookings, title: str, page: int):
     page_items, page, total_pages = _paginate(bookings, page)
-    lines = [f"{title}\n", f"Страница {page + 1} из {total_pages}\n"]
+    lines = [f"🗓 <b>{title}</b>", f"<i>Страница {page + 1} из {total_pages}</i>", ""]
     for idx, (_booking_id, name, phone, date, time, price, status) in enumerate(page_items, start=1 + page * BOOKINGS_PAGE_SIZE):
         safe_name = escape(name)
         safe_phone = escape(phone)
         safe_date = escape(date)
         safe_time = escape(time)
-        lines.append(f"<b>{idx}.</b> [{escape(_status_label(status))}] {safe_date} {safe_time} - {safe_name} ({safe_phone}), {escape(format_money(price))}")
+        status_badge = {
+            "scheduled": "🟢 Активна",
+            "completed": "✅ Выполнена",
+            "cancelled": "❌ Отменена",
+        }.get(status, escape(_status_label(status)))
+        lines.append(
+            f"┌ <b>Запись #{idx}</b>\n"
+            f"├ <b>Когда:</b> {safe_date} в {safe_time}\n"
+            f"├ <b>Клиент:</b> {safe_name}\n"
+            f"├ <b>Телефон:</b> {safe_phone}\n"
+            f"├ <b>Статус:</b> {status_badge}\n"
+            f"└ <b>Сумма:</b> {escape(format_money(price))}\n"
+        )
     if not page_items:
-        lines.append("Записей нет.")
+        lines.append("Записей пока нет.")
     return "\n".join(lines), page_items, page, total_pages
 
 
@@ -193,8 +205,8 @@ async def _show_booking_list(message_or_callback, *, context: str, page: int = 0
 
 
 async def send_client_home(message: types.Message, *, text: str, is_admin: bool) -> None:
-    await message.answer(text, reply_markup=keyboards.get_booking_launch_keyboard())
-    await message.answer("Меню клиента обновлено.", reply_markup=keyboards.get_main_menu(is_admin=is_admin))
+    await message.answer(text, parse_mode="HTML", reply_markup=keyboards.get_booking_launch_keyboard())
+    await message.answer("👤 <b>Меню клиента обновлено</b>", parse_mode="HTML", reply_markup=keyboards.get_main_menu(is_admin=is_admin))
 
 
 @router.message(Command("start"))
@@ -203,14 +215,15 @@ async def start_handler(message: types.Message):
     is_admin = bool(admin_id and str(message.from_user.id) == admin_id)
 
     if is_admin:
-        await message.answer("Добро пожаловать в панель администратора!", reply_markup=keyboards.admin_menu)
+        await message.answer(
+            "⚙️ <b>Панель администратора</b>\n\nВыберите нужный раздел ниже.",
+            parse_mode="HTML",
+            reply_markup=keyboards.admin_menu,
+        )
         return
 
-    await send_client_home(
-        message,
-        text=salon_config.get("welcome_text", "Привет! Выберите нужное действие:"),
-        is_admin=is_admin,
-    )
+    welcome_text = salon_config.get("welcome_text", "Привет! Выберите нужное действие:")
+    await send_client_home(message, text=welcome_text, is_admin=is_admin)
 
 
 @router.message(F.text == "👤 Главное меню")
@@ -220,7 +233,7 @@ async def client_menu_handler(message: types.Message):
     is_admin = bool(admin_id and str(message.from_user.id) == admin_id)
     if not is_admin:
         return
-    await send_client_home(message, text="Вы переключились в главное меню клиента.", is_admin=is_admin)
+    await send_client_home(message, text="👤 <b>Главное меню клиента</b>\n\nЗдесь можно оформить новую запись и посмотреть актуальную информацию.", is_admin=is_admin)
 
 
 @router.message(Command("admin"))
@@ -229,7 +242,11 @@ async def admin_handler(message: types.Message):
     admin_id = getenv("ADMIN_ID")
     if not admin_id or str(message.from_user.id) != admin_id:
         return
-    await message.answer("Добро пожаловать в панель администратора!", reply_markup=keyboards.admin_menu)
+    await message.answer(
+        "⚙️ <b>Панель администратора</b>\n\nВыберите нужный раздел ниже.",
+        parse_mode="HTML",
+        reply_markup=keyboards.admin_menu,
+    )
 
 
 @router.callback_query(F.data == "back_to_admin_menu")
@@ -242,7 +259,11 @@ async def back_to_admin_menu_callback(callback: types.CallbackQuery, state):
         await callback.message.delete()
     except Exception:
         pass
-    await callback.message.answer("Добро пожаловать в панель администратора!", reply_markup=keyboards.admin_menu)
+    await callback.message.answer(
+        "⚙️ <b>Панель администратора</b>\n\nВыберите нужный раздел ниже.",
+        parse_mode="HTML",
+        reply_markup=keyboards.admin_menu,
+    )
 
 
 @router.callback_query(F.data == "cancel_admin_action")
@@ -263,15 +284,19 @@ async def export_excel_handler(message: types.Message):
 
     bookings = await database.get_all_bookings()
     if not bookings:
-        await message.answer("Пока нет ни одной записи для выгрузки.")
+        await message.answer("📃 <b>Нет записей для выгрузки</b>", parse_mode="HTML")
         return
 
     file_path = "bookings_export.xlsx"
     _build_bookings_workbook(file_path, bookings)
 
     excel_file = FSInputFile(file_path)
-    caption = f"Экспорт записей\nСалон: {salon_config.get('salon_name', 'Салон')}\nВсего записей: {len(bookings)}"
-    await message.answer_document(excel_file, caption=caption)
+    caption = (
+        f"📃 <b>Экспорт записей</b>\n"
+        f"<b>Салон:</b> {escape(salon_config.get('salon_name', 'Салон'))}\n"
+        f"<b>Всего записей:</b> {len(bookings)}"
+    )
+    await message.answer_document(excel_file, caption=caption, parse_mode="HTML")
     os.remove(file_path)
 
 
@@ -314,12 +339,12 @@ async def booking_actions_callback(callback: types.CallbackQuery):
         return
     booking_id, user_id, name, phone, date, time, status, _duration = booking
     text = (
-        "Действия по записи:\n\n"
-        f"Клиент: {escape(name)}\n"
-        f"Телефон: {escape(phone)}\n"
-        f"Дата: {escape(date)}\n"
-        f"Время: {escape(time)}\n"
-        f"Статус: {escape(_status_label(status))}"
+        "📝 <b>Карточка записи</b>\n\n"
+        f"<b>Клиент:</b> {escape(name)}\n"
+        f"<b>Телефон:</b> {escape(phone)}\n"
+        f"<b>Дата:</b> {escape(date)}\n"
+        f"<b>Время:</b> {escape(time)}\n"
+        f"<b>Статус:</b> {escape(_status_label(status))}"
     )
     await callback.message.edit_text(
         text,

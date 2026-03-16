@@ -90,9 +90,9 @@ def get_analytics_keyboard():
     from aiogram.utils.keyboard import InlineKeyboardBuilder
 
     builder = InlineKeyboardBuilder()
-    builder.row(InlineKeyboardButton(text="Сегодня", callback_data="stats_today"))
-    builder.row(InlineKeyboardButton(text="За 7 дней", callback_data="stats_week"))
-    builder.row(InlineKeyboardButton(text="За 30 дней", callback_data="stats_month"))
+    builder.row(InlineKeyboardButton(text="📅 Сегодня", callback_data="stats_today"))
+    builder.row(InlineKeyboardButton(text="🗓 За 7 дней", callback_data="stats_week"))
+    builder.row(InlineKeyboardButton(text="📈 За 30 дней", callback_data="stats_month"))
     builder.row(InlineKeyboardButton(text="❌ Отмена", callback_data="cancel_admin_action"))
     return builder.as_markup()
 
@@ -107,9 +107,9 @@ def get_admin_booking_page_keyboard(bookings, context: str, page: int, total_pag
         "cancelled": "❌",
     }
     for booking_id, name, _phone, date, time, _price, status in bookings:
-        label = f"{status_prefix.get(status, '•')} {time} • {_short_name(name)}"
+        label = f"{status_prefix.get(status, '•')} {time} · {_short_name(name)}"
         if context == "all":
-            label = f"{status_prefix.get(status, '•')} {date} • {_short_name(name)}"
+            label = f"{status_prefix.get(status, '•')} {date} · {time} · {_short_name(name)}"
         builder.row(
             InlineKeyboardButton(
                 text=label,

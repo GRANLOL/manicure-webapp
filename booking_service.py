@@ -44,28 +44,28 @@ async def create_booking_and_notify(
         price=price,
     )
     if not booking_created:
-        return False, "Выбранный слот уже занят. Обновите форму и выберите другое время."
+        return False, "Этот слот уже занят.\n\nОбновите форму записи и выберите другое время."
 
     msg_text = (
-        "Новая запись!\n\n"
-        f"Клиент: {full_name_service}\n"
-        f"Тел: {phone}\n"
-        f"Дата: {date}\n"
-        f"Время: {time}"
+        "🔔 <b>Новая запись</b>\n\n"
+        f"<b>Клиент:</b> {escape(full_name_service)}\n"
+        f"<b>Телефон:</b> {escape(phone)}\n"
+        f"<b>Дата:</b> {escape(date)}\n"
+        f"<b>Время:</b> {escape(time)}"
     )
     admin_id = getenv("ADMIN_ID")
     if admin_id and bot is not None:
         try:
-            await bot.send_message(admin_id, msg_text)
+            await bot.send_message(admin_id, msg_text, parse_mode="HTML")
         except Exception:
             logger.exception("Failed to send booking notification to admin", extra={"admin_id": admin_id})
 
     return True, (
-        "Запись подтверждена!\n\n"
-        f"Услуга: {service}\n"
-        f"Дата: {date}\n"
-        f"Время: {time}\n"
-        f"Телефон: {phone}\n\n"
+        "✨ <b>Запись подтверждена</b>\n\n"
+        f"<b>Услуга:</b> {escape(service)}\n"
+        f"<b>Дата:</b> {escape(date)}\n"
+        f"<b>Время:</b> {escape(time)}\n"
+        f"<b>Телефон:</b> {escape(phone)}\n\n"
         "Ждём вас!"
     )
 
@@ -101,7 +101,7 @@ async def finalize_web_booking(
     remove_msg = await message.answer("Загрузка...", reply_markup=types.ReplyKeyboardRemove())
     await remove_msg.delete()
 
-    await message.answer(result_text, reply_markup=keyboards.get_main_menu(is_admin=is_admin))
+    await message.answer(result_text, parse_mode="HTML", reply_markup=keyboards.get_main_menu(is_admin=is_admin))
 
 
 def format_user_booking_text(name: str, phone: str, date: str, time: str, status: str = "scheduled") -> str:
@@ -110,13 +110,14 @@ def format_user_booking_text(name: str, phone: str, date: str, time: str, status
     safe_date = escape(date)
     safe_time = escape(time)
     safe_status = escape(get_booking_status_label(status))
-    text = "Ваша запись:\n\n"
-    text += f"Статус: {safe_status}\n"
-    text += f"Имя/Услуга: {safe_name}\n"
-    text += f"Дата: {safe_date}\n"
-    text += f"Время: {safe_time}\n"
-    text += f"Телефон: {safe_phone}\n"
-    return text
+    return (
+        "📌 <b>Ваша запись</b>\n\n"
+        f"<b>Статус:</b> {safe_status}\n"
+        f"<b>Имя / услуга:</b> {safe_name}\n"
+        f"<b>Дата:</b> {safe_date}\n"
+        f"<b>Время:</b> {safe_time}\n"
+        f"<b>Телефон:</b> {safe_phone}"
+    )
 
 
 async def cancel_booking_and_notify(
@@ -129,18 +130,21 @@ async def cancel_booking_and_notify(
     time: str,
 ) -> None:
     await database.cancel_booking_by_id(booking_id)
-    await callback.message.edit_text("Ваша запись успешно отменена.")
+    await callback.message.edit_text(
+        "❌ <b>Запись отменена</b>\n\nЕсли захотите, можно записаться заново.",
+        parse_mode="HTML",
+    )
 
     msg_text = (
-        "Отмена записи\n\n"
-        f"Клиент: {name}\n"
-        f"Дата: {date}\n"
-        f"Время: {time}\n"
-        f"Телефон: {phone}"
+        "⚠️ <b>Отмена записи</b>\n\n"
+        f"<b>Клиент:</b> {escape(name)}\n"
+        f"<b>Дата:</b> {escape(date)}\n"
+        f"<b>Время:</b> {escape(time)}\n"
+        f"<b>Телефон:</b> {escape(phone)}"
     )
     admin_id = getenv("ADMIN_ID")
     if admin_id:
         try:
-            await callback.bot.send_message(admin_id, msg_text)
+            await callback.bot.send_message(admin_id, msg_text, parse_mode="HTML")
         except Exception:
             logger.exception("Failed to send cancellation notification to admin", extra={"admin_id": admin_id})

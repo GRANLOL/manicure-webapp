@@ -11,7 +11,7 @@ async def analytics_menu_handler(message: types.Message):
     if not admin_id or str(message.from_user.id) != admin_id:
         return
     await message.answer(
-        "📊 <b>Выберите период для статистики:</b>",
+        "📊 <b>Статистика</b>\n\nВыберите период, за который нужно показать отчет.",
         reply_markup=keyboards.get_analytics_keyboard(),
         parse_mode="HTML",
     )
@@ -26,7 +26,7 @@ async def _send_stats(callback: types.CallbackQuery, period_days: int, period_la
     if not admin_id or str(callback.from_user.id) != admin_id:
         return
     await callback.answer()
-    await callback.message.edit_text("⏳ Считаю...", parse_mode="HTML")
+    await callback.message.edit_text("⏳ <b>Собираю статистику...</b>", parse_mode="HTML")
     report = await build_stats_report(period_days, period_label)
     await callback.message.edit_text(report, parse_mode="HTML", reply_markup=keyboards.get_analytics_keyboard())
 

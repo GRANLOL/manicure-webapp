@@ -16,7 +16,7 @@ class CatalogHandlerTests(unittest.IsolatedAsyncioTestCase):
 
         state.update_data.assert_awaited_once_with(service_id=7)
         state.set_state.assert_awaited_once()
-        callback.message.answer.assert_awaited_once_with(ANY, reply_markup="kb")
+        callback.message.answer.assert_awaited_once_with(ANY, parse_mode="HTML", reply_markup="kb")
         callback.answer.assert_awaited_once()
 
     async def test_process_edit_service_duration_updates_service(self):
@@ -51,7 +51,7 @@ class CatalogHandlerTests(unittest.IsolatedAsyncioTestCase):
 
         state.update_data.assert_awaited_once_with(category_id=2)
         state.set_state.assert_awaited_once()
-        callback.message.edit_text.assert_awaited_once_with(ANY, reply_markup="kb")
+        callback.message.edit_text.assert_awaited_once_with(ANY, parse_mode="HTML", reply_markup="kb")
 
     async def test_process_service_duration_retries_on_invalid_number(self):
         message = make_message(text="abc")
@@ -74,7 +74,7 @@ class CatalogHandlerTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(update_mock.await_count, 2)
         state.clear.assert_awaited_once()
-        callback.message.edit_text.assert_awaited_once_with(ANY, reply_markup="kb")
+        callback.message.edit_text.assert_awaited_once_with(ANY, parse_mode="HTML", reply_markup="kb")
 
     async def test_back_to_services_callback_restores_requested_page(self):
         callback = make_callback(data="back_to_services", user_id=1)
@@ -89,7 +89,7 @@ class CatalogHandlerTests(unittest.IsolatedAsyncioTestCase):
             await catalog_handlers.back_to_services_callback(callback, state)
 
         state.clear.assert_awaited_once()
-        callback.message.edit_text.assert_awaited_once_with(ANY, reply_markup="kb")
+        callback.message.edit_text.assert_awaited_once_with(ANY, parse_mode="HTML", reply_markup="kb")
 
 
 class SettingsHandlerTests(unittest.IsolatedAsyncioTestCase):
@@ -126,7 +126,7 @@ class SettingsHandlerTests(unittest.IsolatedAsyncioTestCase):
 
         update_mock.assert_called_once()
         state.clear.assert_awaited_once()
-        message.answer.assert_awaited_once_with(ANY, reply_markup="kb")
+        message.answer.assert_awaited_once_with(ANY, parse_mode="HTML", reply_markup="kb")
 
     async def test_process_booking_window_rejects_invalid_value(self):
         message = make_message(text="0")
@@ -145,5 +145,5 @@ class SettingsHandlerTests(unittest.IsolatedAsyncioTestCase):
         with patch.object(settings_handlers.keyboards, "get_cancel_admin_action_keyboard", return_value="kb"):
             await settings_handlers.process_working_hours(message, state)
 
-        message.answer.assert_awaited_once_with(ANY, reply_markup="kb")
+        message.answer.assert_awaited_once_with(ANY, parse_mode="HTML", reply_markup="kb")
         state.clear.assert_not_awaited()
