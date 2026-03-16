@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from .base import _slot_overlaps, _time_to_minutes, _to_iso_date, aiosqlite, datetime
-from time_utils import get_salon_today
+from time_utils import build_reminder_schedule, combine_salon_datetime, get_salon_today
 
 
 def _duration_from_range(start_time: str, end_time: str) -> int:
@@ -14,10 +14,22 @@ def _duration_from_range(start_time: str, end_time: str) -> int:
 
 async def add_booking(user_id, name, phone, date, time, duration=60, service_name=None, price=0):
     date_iso = _to_iso_date(date)
+    booking_date = datetime.strptime(date, "%d.%m.%Y").date()
+    booking_time = datetime.strptime(time, "%H:%M").time()
+    booking_dt = combine_salon_datetime(booking_date, booking_time)
+    schedule = build_reminder_schedule(booking_dt)
     async with aiosqlite.connect("bookings.db") as db:
         await db.execute(
-            "INSERT INTO bookings (user_id, name, phone, date, date_iso, time, duration, service_name, price) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            (user_id, name, phone, date, date_iso, time, duration, service_name, price),
+            """
+            INSERT INTO bookings (
+                user_id, name, phone, date, date_iso, time, duration, service_name, price,
+                created_at, first_reminder_due_at, second_reminder_due_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                user_id, name, phone, date, date_iso, time, duration, service_name, price,
+                schedule["created_at"], schedule["first_reminder_due_at"], schedule["second_reminder_due_at"],
+            ),
         )
         await db.commit()
 
@@ -52,9 +64,21 @@ async def create_booking_if_available(
                 await db.rollback()
                 return False
 
+        booking_date = datetime.strptime(date, "%d.%m.%Y").date()
+        booking_time = datetime.strptime(time, "%H:%M").time()
+        booking_dt = combine_salon_datetime(booking_date, booking_time)
+        schedule = build_reminder_schedule(booking_dt)
         await db.execute(
-            "INSERT INTO bookings (user_id, name, phone, date, date_iso, time, duration, service_name, price) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            (user_id, name, phone, date, date_iso, time, duration, service_name, price),
+            """
+            INSERT INTO bookings (
+                user_id, name, phone, date, date_iso, time, duration, service_name, price,
+                created_at, first_reminder_due_at, second_reminder_due_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                user_id, name, phone, date, date_iso, time, duration, service_name, price,
+                schedule["created_at"], schedule["first_reminder_due_at"], schedule["second_reminder_due_at"],
+            ),
         )
         await db.commit()
         return True
@@ -188,15 +212,32 @@ async def get_booking_record_by_id(booking_id: int):
             return await cursor.fetchone()
 
 
-async def get_bookings_for_reminders(max_level: int):
+async def get_due_first_reminders(now_iso: str):
     async with aiosqlite.connect("bookings.db") as db:
         async with db.execute(
             """
-            SELECT id, user_id, name, date, time, reminder_level
+            SELECT id, user_id, name, date, time
             FROM bookings
-            WHERE reminder_level < ?
+            WHERE first_reminder_due_at IS NOT NULL
+              AND first_reminder_sent_at IS NULL
+              AND first_reminder_due_at <= ?
             """,
-            (max_level,),
+            (now_iso,),
+        ) as cursor:
+            return await cursor.fetchall()
+
+
+async def get_due_second_reminders(now_iso: str):
+    async with aiosqlite.connect("bookings.db") as db:
+        async with db.execute(
+            """
+            SELECT id, user_id, name, date, time
+            FROM bookings
+            WHERE second_reminder_due_at IS NOT NULL
+              AND second_reminder_sent_at IS NULL
+              AND second_reminder_due_at <= ?
+            """,
+            (now_iso,),
         ) as cursor:
             return await cursor.fetchall()
 
@@ -214,9 +255,29 @@ async def get_booking_by_id(booking_id: int):
             return await cursor.fetchone()
 
 
-async def update_reminder_level(booking_id: int, level: int):
+async def mark_first_reminder_sent(booking_id: int, sent_at: str):
     async with aiosqlite.connect("bookings.db") as db:
-        await db.execute("UPDATE bookings SET reminder_level = ? WHERE id = ?", (level, booking_id))
+        await db.execute(
+            """
+            UPDATE bookings
+            SET first_reminder_sent_at = COALESCE(first_reminder_sent_at, ?)
+            WHERE id = ?
+            """,
+            (sent_at, booking_id),
+        )
+        await db.commit()
+
+
+async def mark_second_reminder_sent(booking_id: int, sent_at: str):
+    async with aiosqlite.connect("bookings.db") as db:
+        await db.execute(
+            """
+            UPDATE bookings
+            SET second_reminder_sent_at = COALESCE(second_reminder_sent_at, ?)
+            WHERE id = ?
+            """,
+            (sent_at, booking_id),
+        )
         await db.commit()
 
 
