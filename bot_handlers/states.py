@@ -59,12 +59,6 @@ class AddSubcategoryExistingForm(StatesGroup):
     name = State()
 
 
-class AddMasterForm(StatesGroup):
-    name = State()
-    telegram_id = State()
-    category_id = State()
-
-
 class WorkingHoursForm(StatesGroup):
     hours = State()
 

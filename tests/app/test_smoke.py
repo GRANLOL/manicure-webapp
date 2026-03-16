@@ -31,7 +31,7 @@ class AppSmokeTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_create_booking_returns_success_payload(self):
         with patch.object(main, "require_webapp_auth"), \
-             patch.object(main, "get_user_from_init_data", return_value={"id": 5, "first_name": "Alice"}), \
+            patch.object(main, "get_user_from_init_data", return_value={"id": 5, "first_name": "Alice"}), \
              patch.object(main, "validate_web_booking", AsyncMock(return_value=({
                  "service": {"name": "Маникюр"},
                  "date": "15.03.2026",
@@ -45,3 +45,11 @@ class AppSmokeTests(unittest.IsolatedAsyncioTestCase):
             payload = await main.create_booking({"service": "Маникюр"}, "init-data")
 
         self.assertEqual(payload, {"ok": True, "message": "ok"})
+
+    async def test_healthcheck_returns_runtime_status(self):
+        main.app.state.bot = object()
+
+        payload = await main.healthcheck()
+
+        self.assertEqual(payload["ok"], True)
+        self.assertEqual(payload["bot_ready"], True)

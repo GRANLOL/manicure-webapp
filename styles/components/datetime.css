@@ -21,8 +21,7 @@
 
 /* Base Card Styles */
 .date-card,
-.time-slot,
-.master-card {
+.time-slot {
     background-color: var(--card-bg);
     border-radius: var(--border-radius-sm);
     box-shadow: var(--shadow-sm);

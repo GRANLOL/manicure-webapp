@@ -44,6 +44,21 @@ def require_webapp_auth(x_telegram_init_data: str | None) -> None:
         )
         raise HTTPException(status_code=401, detail="Unauthorized")
 
+
+@app.on_event("startup")
+async def startup_event() -> None:
+    await init_db()
+    logger.info("Database initialized.")
+
+
+@app.get("/api/health")
+async def healthcheck() -> dict:
+    return {
+        "ok": True,
+        "webapp_auth_required": WEBAPP_AUTH_REQUIRED,
+        "bot_ready": app.state.bot is not None,
+    }
+
 @app.get("/api/busy-slots")
 async def get_busy_slots(x_telegram_init_data: str | None = Header(default=None)) -> dict:
     require_webapp_auth(x_telegram_init_data)
@@ -104,10 +119,6 @@ async def create_booking(payload: dict, x_telegram_init_data: str | None = Heade
     return {"ok": True, "message": message}
 
 async def main():
-    # Initialize the database
-    await init_db()
-    logging.info("Database initialized.")
-
     # Initialize bot and dispatcher
     bot = Bot(token=BOT_TOKEN)
     app.state.bot = bot

@@ -156,7 +156,7 @@ async def my_bookings_handler(message: types.Message):
         await message.answer("У вас нет активных записей.")
         return
 
-    for booking_id, name, phone, date, time, _master_id in bookings:
+    for booking_id, name, phone, date, time in bookings:
         await message.answer(
             format_user_booking_text(name, phone, date, time),
             reply_markup=keyboards.get_cancel_keyboard(message.from_user.id, booking_id),
@@ -191,7 +191,7 @@ async def cancel_booking_callback(callback: types.CallbackQuery):
         return
 
     if len(parts) > 2 and booking_id is not None:
-        _id, _user_id, name, phone, date, time, _master_id = booking
+        _id, _user_id, name, phone, date, time = booking
     else:
         name, phone, date, time, booking_id = booking[:5]
 

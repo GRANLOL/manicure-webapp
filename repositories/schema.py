@@ -13,8 +13,7 @@ async def init_db():
                 phone TEXT,
                 date TEXT,
                 date_iso TEXT,
-                time TEXT,
-                master_id INTEGER
+                time TEXT
             )
         """)
         await db.execute("""
@@ -37,10 +36,6 @@ async def init_db():
             await db.execute("ALTER TABLE services ADD COLUMN category_id INTEGER")
         except aiosqlite.OperationalError:
             # Column already exists
-            pass
-        try:
-            await db.execute("ALTER TABLE bookings ADD COLUMN master_id INTEGER")
-        except aiosqlite.OperationalError:
             pass
         try:
             await db.execute("ALTER TABLE bookings ADD COLUMN date_iso TEXT")
@@ -73,14 +68,6 @@ async def init_db():
             )
         """)
         await db.execute("""
-            CREATE TABLE IF NOT EXISTS masters (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name TEXT,
-                telegram_id TEXT,
-                category_id INTEGER
-            )
-        """)
-        await db.execute("""
             CREATE TABLE IF NOT EXISTS blocked_slots (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 date TEXT NOT NULL,
@@ -98,7 +85,6 @@ async def init_db():
               AND substr(date, 3, 1) = '.'
               AND substr(date, 6, 1) = '.'
         """)
-        await db.execute("CREATE INDEX IF NOT EXISTS idx_bookings_date_master_time ON bookings(date, master_id, time)")
         await db.execute("CREATE INDEX IF NOT EXISTS idx_bookings_date_iso_time ON bookings(date_iso, time)")
         await db.execute("CREATE INDEX IF NOT EXISTS idx_bookings_user_id ON bookings(user_id)")
         await db.execute("CREATE INDEX IF NOT EXISTS idx_blocked_slots_date_time ON blocked_slots(date, start_time, end_time)")

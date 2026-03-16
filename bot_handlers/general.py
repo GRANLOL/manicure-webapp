@@ -308,7 +308,7 @@ async def booking_actions_callback(callback: types.CallbackQuery):
     if not booking:
         await callback.answer("Запись не найдена", show_alert=True)
         return
-    booking_id, user_id, name, phone, date, time, _master_id = booking
+    booking_id, user_id, name, phone, date, time = booking
     text = (
         "Действия по записи:\n\n"
         f"Клиент: {escape(name)}\n"

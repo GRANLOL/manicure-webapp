@@ -31,7 +31,6 @@ async def create_booking_and_notify(
         phone=phone,
         date=date,
         time=time,
-        master_id=None,
         duration=duration,
         service_name=service,
         price=price,

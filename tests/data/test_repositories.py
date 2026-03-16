@@ -1,6 +1,5 @@
 import unittest
 from datetime import date
-
 from unittest.mock import patch
 
 from repositories.analytics import get_bookings_by_weekday, get_revenue_stats
@@ -15,16 +14,15 @@ from tests.support import RepositoryTestCase
 
 
 class BookingRepositoryTests(RepositoryTestCase):
-    async def test_create_booking_prevents_overlap_for_same_master(self):
+    async def test_create_booking_prevents_overlap_for_busy_slot(self):
         created = await create_booking_if_available(
             user_id=1,
             name="Alice",
             phone="+10000000001",
             date="14.03.2026",
             time="10:00",
-            master_id=1,
             duration=60,
-            service_name="РњР°РЅРёРєСЋСЂ",
+            service_name="Маникюр",
             price=2000,
         )
         overlapping = await create_booking_if_available(
@@ -33,20 +31,18 @@ class BookingRepositoryTests(RepositoryTestCase):
             phone="+10000000002",
             date="14.03.2026",
             time="10:30",
-            master_id=1,
             duration=60,
-            service_name="РњР°РЅРёРєСЋСЂ",
+            service_name="Маникюр",
             price=2000,
         )
-        other_master = await create_booking_if_available(
+        later_slot = await create_booking_if_available(
             user_id=3,
             name="Carol",
             phone="+10000000003",
             date="14.03.2026",
-            time="10:30",
-            master_id=2,
+            time="11:00",
             duration=60,
-            service_name="РњР°РЅРёРєСЋСЂ",
+            service_name="Маникюр",
             price=2000,
         )
 
@@ -54,7 +50,7 @@ class BookingRepositoryTests(RepositoryTestCase):
 
         self.assertTrue(created)
         self.assertFalse(overlapping)
-        self.assertTrue(other_master)
+        self.assertTrue(later_slot)
         self.assertEqual(len(bookings), 2)
 
     async def test_create_booking_allows_non_overlapping_slots(self):
@@ -64,7 +60,6 @@ class BookingRepositoryTests(RepositoryTestCase):
             phone="+10000000001",
             date="14.03.2026",
             time="10:00",
-            master_id=1,
             duration=60,
         )
         second = await create_booking_if_available(
@@ -73,7 +68,6 @@ class BookingRepositoryTests(RepositoryTestCase):
             phone="+10000000002",
             date="14.03.2026",
             time="11:00",
-            master_id=1,
             duration=60,
         )
 
@@ -87,7 +81,6 @@ class BookingRepositoryTests(RepositoryTestCase):
             phone="+10000000001",
             date="15.03.2026",
             time="10:00",
-            master_id=1,
             duration=60,
             service_name="Маникюр",
             price=2000,
@@ -105,7 +98,6 @@ class BookingRepositoryTests(RepositoryTestCase):
             phone="+10000000001",
             date="15.03.2026",
             time="10:00",
-            master_id=1,
             duration=60,
             service_name="Маникюр",
             price=2000,
@@ -116,7 +108,6 @@ class BookingRepositoryTests(RepositoryTestCase):
             phone="+10000000002",
             date="16.03.2026",
             time="11:00",
-            master_id=1,
             duration=60,
             service_name="Маникюр",
             price=2500,
@@ -125,8 +116,8 @@ class BookingRepositoryTests(RepositoryTestCase):
         with patch("repositories.analytics._period_start_date", return_value=date(2026, 3, 15)):
             weekday_stats = await get_bookings_by_weekday(0)
 
-        self.assertEqual(weekday_stats["Вс"], 1)
         self.assertEqual(weekday_stats["Пн"], 0)
+        self.assertEqual(weekday_stats["Вс"], 1)
 
 
 class CategoryRepositoryTests(RepositoryTestCase):

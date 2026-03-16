@@ -2,7 +2,6 @@ from bot_handlers import router
 from bot_handlers.states import (
     AddBlacklistDateForm,
     AddBookingWindowForm,
-    AddMasterForm,
     AddServiceForm,
     AddSubcategoryExistingForm,
     BookingForm,
@@ -29,7 +28,6 @@ __all__ = [
     "EditServiceForm",
     "EditCategoryForm",
     "AddSubcategoryExistingForm",
-    "AddMasterForm",
     "WorkingHoursForm",
     "ScheduleIntervalForm",
     "AddBookingWindowForm",

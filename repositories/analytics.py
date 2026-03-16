@@ -27,7 +27,12 @@ async def _get_bookings_in_period(period_days: int):
 
 async def get_revenue_stats(period_days: int) -> dict:
     bookings = await _get_bookings_in_period(period_days)
-    prices = [int(float(item["price"] or 0)) for item in bookings]
+    prices = []
+    for item in bookings:
+        try:
+            prices.append(int(float(item["price"] or 0)))
+        except (TypeError, ValueError):
+            prices.append(0)
     total_bookings = len(bookings)
     total_revenue = sum(prices)
     avg_price = int(total_revenue / total_bookings) if total_bookings else 0

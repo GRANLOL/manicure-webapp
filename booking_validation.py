@@ -1,8 +1,9 @@
 import re
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 
 import database
 from config import salon_config
+from time_utils import combine_salon_datetime, get_salon_now
 
 
 def parse_working_hours(working_hours: str) -> tuple[int, int]:
@@ -59,7 +60,6 @@ async def validate_web_booking(data: dict) -> tuple[dict | None, str | None]:
 
     duration = int(service.get("duration") or 60)
     price = int(service.get("price_value") or 0)
-    master_id = None
 
     try:
         booking_date = datetime.strptime(date_str, "%d.%m.%Y").date()
@@ -67,10 +67,8 @@ async def validate_web_booking(data: dict) -> tuple[dict | None, str | None]:
     except ValueError:
         return None, "Дата или время переданы в неверном формате."
 
-    tz_offset = salon_config.get("timezone_offset", 3)
-    salon_tz = timezone(timedelta(hours=tz_offset))
-    salon_now = datetime.now(timezone.utc).astimezone(salon_tz)
-    booking_dt = datetime.combine(booking_date, booking_time, tzinfo=salon_tz)
+    salon_now = get_salon_now()
+    booking_dt = combine_salon_datetime(booking_date, booking_time)
     if booking_dt <= salon_now:
         return None, "Нельзя записаться на прошедшее время. Выберите другой слот."
 
@@ -99,7 +97,7 @@ async def validate_web_booking(data: dict) -> tuple[dict | None, str | None]:
     if (slot_mins - start_mins) % interval != 0:
         return None, "Выбранное время не соответствует шагу расписания. Обновите форму и выберите слот заново."
 
-    busy_slots = await database.get_busy_slots_by_date(date_str, master_id=master_id)
+    busy_slots = await database.get_busy_slots_by_date(date_str)
     for busy in busy_slots:
         try:
             busy_h, busy_m = map(int, busy["time"].split(":"))
@@ -119,5 +117,4 @@ async def validate_web_booking(data: dict) -> tuple[dict | None, str | None]:
         "price": price,
         "phone": phone,
         "name": client_name,
-        "master_id": master_id,
     }, None

@@ -4,6 +4,7 @@ import re
 from datetime import datetime, timedelta
 
 import aiosqlite
+from time_utils import get_salon_today
 
 
 def _slot_overlaps(slot_start: int, slot_duration: int, busy_start: int, busy_duration: int) -> bool:
@@ -21,7 +22,7 @@ def _time_to_minutes(value: str) -> int | None:
 
 
 def _period_start_date(period_days: int):
-    today = datetime.now().date()
+    today = get_salon_today()
     return today if period_days <= 0 else today - timedelta(days=period_days - 1)
 
 

@@ -13,3 +13,4 @@ run_stdout.log
 run_stderr.log
 local_*.log
 .test_tmp/
+backups/
