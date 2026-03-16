@@ -22,6 +22,7 @@ from .base import (
 
 router = Router()
 logger = logging.getLogger(__name__)
+USER_HISTORY_LIMIT = 5
 
 
 def format_price_list_page(services, page: int, page_size: int = 20):
@@ -161,13 +162,38 @@ async def my_bookings_handler(message: types.Message):
     await database.sync_completed_bookings()
     bookings = await database.get_user_bookings(message.from_user.id)
     if not bookings:
-        await message.answer("📋 <b>Ваших активных записей пока нет</b>", parse_mode="HTML")
+        await message.answer(
+            "📋 <b>У вас пока нет записей</b>\n\nКогда будете готовы, откройте форму и выберите удобное время.",
+            parse_mode="HTML",
+        )
         return
 
-    for booking_id, name, phone, date, time, status in bookings:
+    active_bookings = [booking for booking in bookings if booking[5] == "scheduled"]
+    history_bookings = [booking for booking in bookings if booking[5] != "scheduled"][:USER_HISTORY_LIMIT]
+
+    if active_bookings:
+        await message.answer(
+            "📌 <b>Активные записи</b>\n\nЗдесь собраны предстоящие визиты. Их можно отменить прямо из кабинета.",
+            parse_mode="HTML",
+        )
+
+    for booking_id, name, phone, date, time, status in active_bookings:
         await message.answer(
             format_user_booking_text(name, phone, date, time, status=status),
-            reply_markup=keyboards.get_cancel_keyboard(message.from_user.id, booking_id) if status == "scheduled" else None,
+            reply_markup=keyboards.get_cancel_keyboard(message.from_user.id, booking_id),
+            parse_mode="HTML",
+        )
+
+    if history_bookings:
+        history_title = "🕘 <b>История</b>\n\nЗдесь сохраняются последние завершённые и отменённые записи."
+        if len(bookings) - len(active_bookings) > USER_HISTORY_LIMIT:
+            history_title += f"\n<i>Показаны последние {USER_HISTORY_LIMIT} записей.</i>"
+        await message.answer(history_title, parse_mode="HTML")
+
+    for _booking_id, name, phone, date, time, status in history_bookings:
+        await message.answer(
+            format_user_booking_text(name, phone, date, time, status=status),
+            reply_markup=None,
             parse_mode="HTML",
         )
 

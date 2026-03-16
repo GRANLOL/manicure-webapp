@@ -238,7 +238,7 @@ async def get_user_bookings(user_id: int):
             """
             SELECT id, name, phone, date, time, status
             FROM bookings
-            WHERE user_id = ? AND status != 'cancelled'
+            WHERE user_id = ?
             ORDER BY
                 CASE status
                     WHEN 'scheduled' THEN 0
