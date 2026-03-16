@@ -10,6 +10,7 @@ from database import (
     get_due_second_reminders,
     mark_first_reminder_sent,
     mark_second_reminder_sent,
+    sync_completed_bookings,
 )
 from keyboards import get_reminder_keyboard
 from time_utils import get_salon_now
@@ -23,6 +24,7 @@ def format_reminder(template: str, name: str, date: str, time: str) -> str:
 
 async def check_reminders(bot: Bot):
     try:
+        await sync_completed_bookings()
         now = get_salon_now()
         now_iso = now.isoformat()
 

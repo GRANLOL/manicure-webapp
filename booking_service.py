@@ -10,6 +10,14 @@ import keyboards
 logger = logging.getLogger(__name__)
 
 
+def get_booking_status_label(status: str) -> str:
+    return {
+        "scheduled": "Активна",
+        "completed": "Выполнена",
+        "cancelled": "Отменена",
+    }.get(status, status)
+
+
 async def create_booking_and_notify(
     *,
     bot,
@@ -36,14 +44,14 @@ async def create_booking_and_notify(
         price=price,
     )
     if not booking_created:
-        return False, "Выбранный слот уже заняли. Обновите форму и выберите другое время."
+        return False, "Выбранный слот уже занят. Обновите форму и выберите другое время."
 
     msg_text = (
-        "🔔 НОВАЯ ЗАПИСЬ!\n\n"
-        f"👤 Клиент: {full_name_service}\n"
-        f"📞 Тел: {phone}\n"
-        f"📅 Дата: {date}\n"
-        f"⏰ Время: {time}"
+        "Новая запись!\n\n"
+        f"Клиент: {full_name_service}\n"
+        f"Тел: {phone}\n"
+        f"Дата: {date}\n"
+        f"Время: {time}"
     )
     admin_id = getenv("ADMIN_ID")
     if admin_id and bot is not None:
@@ -53,12 +61,12 @@ async def create_booking_and_notify(
             logger.exception("Failed to send booking notification to admin", extra={"admin_id": admin_id})
 
     return True, (
-        "✅ Запись подтверждена!\n\n"
+        "Запись подтверждена!\n\n"
         f"Услуга: {service}\n"
-        f"📅 Дата: {date}\n"
-        f"⏰ Время: {time}\n"
-        f"📞 Телефон: {phone}\n\n"
-        "Ждем вас!"
+        f"Дата: {date}\n"
+        f"Время: {time}\n"
+        f"Телефон: {phone}\n\n"
+        "Ждём вас!"
     )
 
 
@@ -90,22 +98,24 @@ async def finalize_web_booking(
         await message.answer(result_text)
         return
 
-    remove_msg = await message.answer("⏳ Загрузка...", reply_markup=types.ReplyKeyboardRemove())
+    remove_msg = await message.answer("Загрузка...", reply_markup=types.ReplyKeyboardRemove())
     await remove_msg.delete()
 
     await message.answer(result_text, reply_markup=keyboards.get_main_menu(is_admin=is_admin))
 
 
-def format_user_booking_text(name: str, phone: str, date: str, time: str) -> str:
+def format_user_booking_text(name: str, phone: str, date: str, time: str, status: str = "scheduled") -> str:
     safe_name = escape(name)
     safe_phone = escape(phone)
     safe_date = escape(date)
     safe_time = escape(time)
-    text = "🗓 <b>Ваша запись:</b>\n\n"
-    text += f"👤 <b>Имя/Услуга:</b> {safe_name}\n"
-    text += f"📅 <b>Дата:</b> {safe_date}\n"
-    text += f"⏰ <b>Время:</b> {safe_time}\n"
-    text += f"📞 <b>Телефон:</b> {safe_phone}\n"
+    safe_status = escape(get_booking_status_label(status))
+    text = "Вашa запись:\n\n"
+    text += f"Статус: {safe_status}\n"
+    text += f"Имя/Услуга: {safe_name}\n"
+    text += f"Дата: {safe_date}\n"
+    text += f"Время: {safe_time}\n"
+    text += f"Телефон: {safe_phone}\n"
     return text
 
 
@@ -118,11 +128,11 @@ async def cancel_booking_and_notify(
     date: str,
     time: str,
 ) -> None:
-    await database.delete_booking_by_id(booking_id)
-    await callback.message.edit_text("✅ Ваша запись успешно отменена.")
+    await database.cancel_booking_by_id(booking_id)
+    await callback.message.edit_text("Ваша запись успешно отменена.")
 
     msg_text = (
-        "⚠️ ОТМЕНА ЗАПИСИ\n\n"
+        "Отмена записи\n\n"
         f"Клиент: {name}\n"
         f"Дата: {date}\n"
         f"Время: {time}\n"

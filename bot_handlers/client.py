@@ -34,11 +34,11 @@ def format_price_list_page(services, page: int, page_size: int = 20):
         cat_name = service.get("category_name") or "Без категории"
         categories[cat_name].append(service)
 
-    lines = [f"<b>💰 ПРАЙС-ЛИСТ | {salon_config.get('salon_name', 'Nail Studio')}</b>", "______________________________\n"]
+    lines = [f"<b>ПРАЙС-ЛИСТ | {salon_config.get('salon_name', 'Nail Studio')}</b>", "______________________________\n"]
     for category_name in sorted(categories.keys()):
-        lines.append(f"<b>📃 {category_name}</b>")
+        lines.append(f"<b>{category_name}</b>")
         for service in categories[category_name]:
-            lines.append(f"▪️ {service['name']} — {service['price']} {currency}")
+            lines.append(f"• {service['name']} — {service['price']} {currency}")
         lines.append("")
 
     total_lines = len(lines)
@@ -91,21 +91,21 @@ async def handle_address(message: types.Message):
     hours = salon_config.get("working_hours", "")
     map_url = salon_config.get("map_url", "")
 
-    text = f"<b>📌 Наш адрес</b>\n\n🏠 {address}\n"
+    text = f"<b>Наш адрес</b>\n\n{address}\n"
     if hours:
-        text += f"⌱ <i>{hours}</i>\n"
+        text += f"<i>{hours}</i>\n"
     if map_url:
-        text += f"\n👉 <a href='{map_url}'>Открыть в картах</a>"
+        text += f"\n<a href='{map_url}'>Открыть в картах</a>"
 
     await message.answer(text, parse_mode="HTML", disable_web_page_preview=False)
 
 
 @router.message(F.text == "💅 Портфолио")
 async def handle_portfolio(message: types.Message):
-    caption = "<b>📸 Наши работы</b>\n\n"
+    caption = "<b>Наши работы</b>\n\n"
     portfolio_url = salon_config.get("portfolio_url", "")
     if portfolio_url:
-        caption += f"🔗 <a href='{portfolio_url}'>Перейти в наше портфолио</a>"
+        caption += f"<a href='{portfolio_url}'>Перейти в портфолио</a>"
     else:
         caption += "Портфолио не указано."
 
@@ -146,20 +146,21 @@ async def process_web_app_data(message: types.Message, state: FSMContext):
         await state.clear()
     except Exception:
         logger.exception("Failed to process web_app_data")
-        await message.answer("⚠️ Произошла ошибка при обработке данных. Попробуйте еще раз.")
+        await message.answer("Произошла ошибка при обработке данных. Попробуйте еще раз.")
 
 
 @router.message(F.text == "📋 Мои записи")
 async def my_bookings_handler(message: types.Message):
+    await database.sync_completed_bookings()
     bookings = await database.get_user_bookings(message.from_user.id)
     if not bookings:
         await message.answer("У вас нет активных записей.")
         return
 
-    for booking_id, name, phone, date, time in bookings:
+    for booking_id, name, phone, date, time, status in bookings:
         await message.answer(
-            format_user_booking_text(name, phone, date, time),
-            reply_markup=keyboards.get_cancel_keyboard(message.from_user.id, booking_id),
+            format_user_booking_text(name, phone, date, time, status=status),
+            reply_markup=keyboards.get_cancel_keyboard(message.from_user.id, booking_id) if status == "scheduled" else None,
             parse_mode="HTML",
         )
 
@@ -191,7 +192,10 @@ async def cancel_booking_callback(callback: types.CallbackQuery):
         return
 
     if len(parts) > 2 and booking_id is not None:
-        _id, _user_id, name, phone, date, time = booking
+        _id, _user_id, name, phone, date, time, status, _duration = booking
+        if status != "scheduled":
+            await callback.answer("Эту запись уже нельзя отменить.", show_alert=True)
+            return
     else:
         name, phone, date, time, booking_id = booking[:5]
 

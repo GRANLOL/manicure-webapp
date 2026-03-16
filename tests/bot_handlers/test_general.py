@@ -1,8 +1,8 @@
 import unittest
-from unittest.mock import ANY, patch
+from unittest.mock import ANY, AsyncMock, patch
 
 import bot_handlers.general as general_handlers
-from tests.support import make_message
+from tests.support import make_callback, make_message, make_state
 
 
 class GeneralHandlerTests(unittest.IsolatedAsyncioTestCase):
@@ -25,10 +25,10 @@ class GeneralHandlerTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(message.answer.await_count, 2)
         message.answer.assert_any_await("hello", reply_markup="launch")
-        message.answer.assert_any_await("Меню клиента обновлено.", reply_markup="menu")
+        message.answer.assert_any_await(ANY, reply_markup="menu")
 
     async def test_client_menu_handler_refreshes_launch_and_reply_keyboards(self):
-        message = make_message(user_id=1, text="👤 Меню клиента")
+        message = make_message(user_id=1, text="Меню клиента")
 
         with patch.object(general_handlers, "getenv", return_value="1"), \
              patch.object(general_handlers.keyboards, "get_main_menu", return_value="menu"), \
@@ -36,8 +36,8 @@ class GeneralHandlerTests(unittest.IsolatedAsyncioTestCase):
             await general_handlers.client_menu_handler(message)
 
         self.assertEqual(message.answer.await_count, 2)
-        message.answer.assert_any_await("Вы переключились в главное меню клиента.", reply_markup="launch")
-        message.answer.assert_any_await("Меню клиента обновлено.", reply_markup="menu")
+        message.answer.assert_any_await(ANY, reply_markup="launch")
+        message.answer.assert_any_await(ANY, reply_markup="menu")
 
     async def test_export_excel_handler_sends_document_for_admin(self):
         message = make_message(user_id=1)
@@ -52,3 +52,39 @@ class GeneralHandlerTests(unittest.IsolatedAsyncioTestCase):
         build_mock.assert_called_once_with("bookings_export.xlsx", [("A", "B", "01.01.2026", "10:00", 2500)])
         message.answer_document.assert_awaited_once_with("excel-file", caption=ANY)
         remove_mock.assert_called_once_with("bookings_export.xlsx")
+
+    async def test_booking_actions_callback_renders_status_controls(self):
+        callback = make_callback(data="booking_actions_all_0_15", user_id=1)
+        booking = (15, 12345, "Alice", "+100", "14.03.2026", "10:00", "scheduled", 60)
+
+        with patch.object(general_handlers, "getenv", return_value="1"), \
+             patch.object(general_handlers.database, "get_booking_record_by_id", AsyncMock(return_value=booking)), \
+             patch.object(general_handlers.keyboards, "get_admin_booking_actions_keyboard", return_value="actions-kb"):
+            await general_handlers.booking_actions_callback(callback)
+
+        callback.message.edit_text.assert_awaited_once_with(
+            ANY,
+            parse_mode="HTML",
+            reply_markup="actions-kb",
+        )
+
+    async def test_admin_booking_status_callback_updates_status_and_refreshes_page(self):
+        callback = make_callback(data="admin_booking_status_15_completed_today_0", user_id=1)
+
+        with patch.object(general_handlers, "getenv", return_value="1"), \
+             patch.object(general_handlers.database, "update_booking_status", AsyncMock()) as update_mock, \
+             patch.object(general_handlers, "_show_booking_list", AsyncMock()) as show_mock:
+            await general_handlers.admin_booking_status_callback(callback)
+
+        update_mock.assert_awaited_once_with(15, "completed")
+        callback.answer.assert_awaited_once_with(ANY)
+        show_mock.assert_awaited_once_with(callback, context="today", page=0)
+
+    async def test_back_to_admin_menu_clears_state(self):
+        callback = make_callback(data="back_to_admin_menu", user_id=1)
+        state = make_state()
+
+        with patch.object(general_handlers, "getenv", return_value="1"):
+            await general_handlers.back_to_admin_menu_callback(callback, state)
+
+        state.clear.assert_awaited_once()

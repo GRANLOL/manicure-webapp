@@ -36,6 +36,14 @@ THIN_BORDER = Border(
 BOOKINGS_PAGE_SIZE = 10
 
 
+def _status_label(status: str) -> str:
+    return {
+        "scheduled": "Активна",
+        "completed": "Выполнена",
+        "cancelled": "Отменена",
+    }.get(status, status)
+
+
 def _safe_parse_date(value: str) -> datetime | None:
     try:
         return datetime.strptime(value, "%d.%m.%Y")
@@ -87,15 +95,15 @@ def _build_bookings_workbook(file_path: str, bookings: list[tuple[str, str, str,
     salon_name = salon_config.get("salon_name", "Салон")
     generated_at = datetime.now().strftime("%d.%m.%Y %H:%M")
     parsed_dates = [parsed for _, _, date, _, _ in bookings if (parsed := _safe_parse_date(date))]
-    min_date = min(parsed_dates).strftime("%d.%m.%Y") if parsed_dates else "—"
-    max_date = max(parsed_dates).strftime("%d.%m.%Y") if parsed_dates else "—"
+    min_date = min(parsed_dates).strftime("%d.%m.%Y") if parsed_dates else "-"
+    max_date = max(parsed_dates).strftime("%d.%m.%Y") if parsed_dates else "-"
     daily_counts = Counter(date for _, _, date, _, _ in bookings)
 
     summary_rows = [
         ("Отчет", f"Записи салона «{salon_name}»"),
         ("Сформирован", generated_at),
         ("Всего записей", len(bookings)),
-        ("Период данных", f"{min_date} — {max_date}"),
+        ("Период данных", f"{min_date} - {max_date}"),
         ("Уникальных телефонов", len({phone for _, phone, _, _, _ in bookings if phone})),
         ("Сумма по записям", format_money(sum(int(price or 0) for _, _, _, _, price in bookings))),
     ]
@@ -115,11 +123,6 @@ def _build_bookings_workbook(file_path: str, bookings: list[tuple[str, str, str,
         label_cell.border = THIN_BORDER
         value_cell.border = THIN_BORDER
 
-    summary_ws["A10"] = "Что внутри"
-    summary_ws["A10"].font = Font(bold=True, color="6B2B43")
-    summary_ws["A11"] = "• Лист «Записи» — полный список клиентов"
-    summary_ws["A12"] = "• Лист «По дням» — количество записей по датам"
-    summary_ws.merge_cells("A10:B10")
     _fit_columns(summary_ws)
 
     bookings_ws.append(["№", "Клиент / услуга", "Телефон", "Дата", "Время", "Цена"])
@@ -159,25 +162,26 @@ def _paginate(items, page: int, page_size: int = BOOKINGS_PAGE_SIZE):
 def _render_booking_page(bookings, title: str, page: int):
     page_items, page, total_pages = _paginate(bookings, page)
     lines = [f"{title}\n", f"Страница {page + 1} из {total_pages}\n"]
-    for idx, (_booking_id, name, phone, date, time, price) in enumerate(page_items, start=1 + page * BOOKINGS_PAGE_SIZE):
+    for idx, (_booking_id, name, phone, date, time, price, status) in enumerate(page_items, start=1 + page * BOOKINGS_PAGE_SIZE):
         safe_name = escape(name)
         safe_phone = escape(phone)
         safe_date = escape(date)
         safe_time = escape(time)
-        lines.append(f"<b>{idx}.</b> {safe_date} {safe_time} — {safe_name} ({safe_phone}), {escape(format_money(price))}")
+        lines.append(f"<b>{idx}.</b> [{escape(_status_label(status))}] {safe_date} {safe_time} - {safe_name} ({safe_phone}), {escape(format_money(price))}")
     if not page_items:
         lines.append("Записей нет.")
     return "\n".join(lines), page_items, page, total_pages
 
 
 async def _show_booking_list(message_or_callback, *, context: str, page: int = 0):
+    await database.sync_completed_bookings()
     if context == "today":
         today_str = datetime.now().strftime("%d.%m.%Y")
         bookings = await database.get_bookings_by_date_detailed(today_str)
-        title = f"🗓 <b>Записи на сегодня ({today_str})</b>"
+        title = f"Записи на сегодня ({today_str})"
     else:
         bookings = await database.get_all_bookings_detailed()
-        title = "🗓 <b>Все записи</b>"
+        title = "Все записи"
 
     text, page_items, page, total_pages = _render_booking_page(bookings, title, page)
     markup = keyboards.get_admin_booking_page_keyboard(page_items, context, page, total_pages)
@@ -266,7 +270,7 @@ async def export_excel_handler(message: types.Message):
     _build_bookings_workbook(file_path, bookings)
 
     excel_file = FSInputFile(file_path)
-    caption = f"📃 Экспорт записей\nСалон: {salon_config.get('salon_name', 'Салон')}\nВсего записей: {len(bookings)}"
+    caption = f"Экспорт записей\nСалон: {salon_config.get('salon_name', 'Салон')}\nВсего записей: {len(bookings)}"
     await message.answer_document(excel_file, caption=caption)
     os.remove(file_path)
 
@@ -308,13 +312,14 @@ async def booking_actions_callback(callback: types.CallbackQuery):
     if not booking:
         await callback.answer("Запись не найдена", show_alert=True)
         return
-    booking_id, user_id, name, phone, date, time = booking
+    booking_id, user_id, name, phone, date, time, status, _duration = booking
     text = (
         "Действия по записи:\n\n"
         f"Клиент: {escape(name)}\n"
         f"Телефон: {escape(phone)}\n"
         f"Дата: {escape(date)}\n"
-        f"Время: {escape(time)}"
+        f"Время: {escape(time)}\n"
+        f"Статус: {escape(_status_label(status))}"
     )
     await callback.message.edit_text(
         text,
@@ -324,6 +329,7 @@ async def booking_actions_callback(callback: types.CallbackQuery):
             phone,
             context,
             int(page_str),
+            status=status,
             telegram_user_id=user_id,
         ),
     )
@@ -338,12 +344,12 @@ async def show_phone_callback(callback: types.CallbackQuery):
     await callback.answer(f"Номер: +{phone}", show_alert=True)
 
 
-@router.callback_query(F.data.startswith("admin_cancel_booking_"))
-async def admin_cancel_booking_callback(callback: types.CallbackQuery):
+@router.callback_query(F.data.startswith("admin_booking_status_"))
+async def admin_booking_status_callback(callback: types.CallbackQuery):
     admin_id = getenv("ADMIN_ID")
     if not admin_id or str(callback.from_user.id) != admin_id:
         return
-    _, _, _, booking_id_str, context, page_str = callback.data.split("_", 5)
-    await database.delete_booking_by_id(int(booking_id_str))
-    await callback.answer("Запись отменена")
+    _, _, _, booking_id_str, status, context, page_str = callback.data.split("_", 6)
+    await database.update_booking_status(int(booking_id_str), status)
+    await callback.answer("Статус обновлен")
     await _show_booking_list(callback, context=context, page=int(page_str))

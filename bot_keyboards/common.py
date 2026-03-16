@@ -16,14 +16,14 @@ def _short_name(name: str, limit: int = 18) -> str:
     value = (name or "").strip()
     if len(value) <= limit:
         return value
-    return value[: limit - 1].rstrip() + "…"
+    return value[: limit - 1].rstrip() + "..."
 
 
 def get_cancel_keyboard(user_id: int, booking_id: int | None = None):
     callback_data = f"cancel_{user_id}_{booking_id}" if booking_id is not None else f"cancel_{user_id}"
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="❌ Отменить запись", callback_data=callback_data)]
+            [InlineKeyboardButton(text="Отменить запись", callback_data=callback_data)]
         ]
     )
 
@@ -31,7 +31,7 @@ def get_cancel_keyboard(user_id: int, booking_id: int | None = None):
 def get_booking_launch_keyboard():
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="🌸 Открыть запись", web_app=WebAppInfo(url=WEBAPP_URL))]
+            [InlineKeyboardButton(text="Открыть запись", web_app=WebAppInfo(url=WEBAPP_URL))]
         ]
     )
 
@@ -40,17 +40,17 @@ def get_back_to_admin_menu_keyboard():
     from aiogram.utils.keyboard import InlineKeyboardBuilder
 
     builder = InlineKeyboardBuilder()
-    builder.row(InlineKeyboardButton(text="◀️ Назад в меню", callback_data="back_to_admin_menu"))
+    builder.row(InlineKeyboardButton(text="Назад в меню", callback_data="back_to_admin_menu"))
     return builder.as_markup()
 
 
-def get_cancel_admin_action_keyboard(back_callback: str | None = None, back_text: str = "◀️ Назад"):
+def get_cancel_admin_action_keyboard(back_callback: str | None = None, back_text: str = "Назад"):
     from aiogram.utils.keyboard import InlineKeyboardBuilder
 
     builder = InlineKeyboardBuilder()
     if back_callback:
         builder.row(InlineKeyboardButton(text=back_text, callback_data=back_callback))
-    builder.row(InlineKeyboardButton(text="❌ Отмена", callback_data="cancel_admin_action"))
+    builder.row(InlineKeyboardButton(text="Отмена", callback_data="cancel_admin_action"))
     return builder.as_markup()
 
 
@@ -64,9 +64,9 @@ def get_client_price_keyboard(page: int, total_pages: int):
     nav_buttons = []
 
     if page > 0:
-        nav_buttons.append(InlineKeyboardButton(text="⬅️ Назад", callback_data=f"client_price_page_{page - 1}"))
+        nav_buttons.append(InlineKeyboardButton(text="Назад", callback_data=f"client_price_page_{page - 1}"))
     if page < total_pages - 1:
-        nav_buttons.append(InlineKeyboardButton(text="Вперед ➡️", callback_data=f"client_price_page_{page + 1}"))
+        nav_buttons.append(InlineKeyboardButton(text="Вперед", callback_data=f"client_price_page_{page + 1}"))
 
     if nav_buttons:
         builder.row(*nav_buttons)
@@ -78,10 +78,10 @@ def get_reminder_keyboard(booking_id: int):
     from aiogram.utils.keyboard import InlineKeyboardBuilder
 
     builder = InlineKeyboardBuilder()
-    builder.row(InlineKeyboardButton(text="✅ Подтвердить", callback_data=f"rem_conf_{booking_id}"))
+    builder.row(InlineKeyboardButton(text="Подтвердить", callback_data=f"rem_conf_{booking_id}"))
     builder.row(
-        InlineKeyboardButton(text="❌ Отменить", callback_data=f"rem_canc_{booking_id}"),
-        InlineKeyboardButton(text="🔄 Перенести", callback_data=f"rem_resched_{booking_id}"),
+        InlineKeyboardButton(text="Отменить", callback_data=f"rem_canc_{booking_id}"),
+        InlineKeyboardButton(text="Перенести", callback_data=f"rem_resched_{booking_id}"),
     )
     return builder.as_markup()
 
@@ -90,10 +90,10 @@ def get_analytics_keyboard():
     from aiogram.utils.keyboard import InlineKeyboardBuilder
 
     builder = InlineKeyboardBuilder()
-    builder.row(InlineKeyboardButton(text="📅 Сегодня", callback_data="stats_today"))
-    builder.row(InlineKeyboardButton(text="📆 За 7 дней", callback_data="stats_week"))
-    builder.row(InlineKeyboardButton(text="🗓 За 30 дней", callback_data="stats_month"))
-    builder.row(InlineKeyboardButton(text="❌ Отмена", callback_data="cancel_admin_action"))
+    builder.row(InlineKeyboardButton(text="Сегодня", callback_data="stats_today"))
+    builder.row(InlineKeyboardButton(text="За 7 дней", callback_data="stats_week"))
+    builder.row(InlineKeyboardButton(text="За 30 дней", callback_data="stats_month"))
+    builder.row(InlineKeyboardButton(text="Отмена", callback_data="cancel_admin_action"))
     return builder.as_markup()
 
 
@@ -101,10 +101,15 @@ def get_admin_booking_page_keyboard(bookings, context: str, page: int, total_pag
     from aiogram.utils.keyboard import InlineKeyboardBuilder
 
     builder = InlineKeyboardBuilder()
-    for booking_id, name, _phone, date, time, _price in bookings:
-        label = f"{time} • {_short_name(name)}"
+    status_prefix = {
+        "scheduled": "●",
+        "completed": "✓",
+        "cancelled": "×",
+    }
+    for booking_id, name, _phone, date, time, _price, status in bookings:
+        label = f"{status_prefix.get(status, '•')} {time} • {_short_name(name)}"
         if context == "all":
-            label = f"{date} • {_short_name(name)}"
+            label = f"{status_prefix.get(status, '•')} {date} • {_short_name(name)}"
         builder.row(
             InlineKeyboardButton(
                 text=label,
@@ -114,13 +119,13 @@ def get_admin_booking_page_keyboard(bookings, context: str, page: int, total_pag
 
     nav = []
     if page > 0:
-        nav.append(InlineKeyboardButton(text="⬅️ Назад", callback_data=f"bookings_page_{context}_{page - 1}"))
+        nav.append(InlineKeyboardButton(text="Назад", callback_data=f"bookings_page_{context}_{page - 1}"))
     if page < total_pages - 1:
-        nav.append(InlineKeyboardButton(text="Вперед ➡️", callback_data=f"bookings_page_{context}_{page + 1}"))
+        nav.append(InlineKeyboardButton(text="Вперед", callback_data=f"bookings_page_{context}_{page + 1}"))
     if nav:
         builder.row(*nav)
 
-    builder.row(InlineKeyboardButton(text="❌ Отмена", callback_data="cancel_admin_action"))
+    builder.row(InlineKeyboardButton(text="Отмена", callback_data="cancel_admin_action"))
     return builder.as_markup()
 
 
@@ -130,6 +135,7 @@ def get_admin_booking_actions_keyboard(
     context: str,
     page: int,
     *,
+    status: str = "scheduled",
     telegram_user_id: int | None = None,
 ):
     from aiogram.utils.keyboard import InlineKeyboardBuilder
@@ -139,16 +145,25 @@ def get_admin_booking_actions_keyboard(
 
     contact_buttons = []
     if telegram_user_id:
-        contact_buttons.append(InlineKeyboardButton(text="💬 Написать", url=f"tg://user?id={telegram_user_id}"))
+        contact_buttons.append(InlineKeyboardButton(text="Написать", url=f"tg://user?id={telegram_user_id}"))
     elif digits:
-        contact_buttons.append(InlineKeyboardButton(text="💬 Написать", url=f"https://wa.me/{digits}"))
+        contact_buttons.append(InlineKeyboardButton(text="Написать", url=f"https://wa.me/{digits}"))
 
     if digits:
-        contact_buttons.append(InlineKeyboardButton(text="📞 Показать номер", callback_data=f"show_phone_{digits}"))
+        contact_buttons.append(InlineKeyboardButton(text="Показать номер", callback_data=f"show_phone_{digits}"))
 
     if contact_buttons:
         builder.row(*contact_buttons)
 
-    builder.row(InlineKeyboardButton(text="❌ Отменить запись", callback_data=f"admin_cancel_booking_{booking_id}_{context}_{page}"))
-    builder.row(InlineKeyboardButton(text="◀️ Назад к списку", callback_data=f"bookings_page_{context}_{page}"))
+    if status == "scheduled":
+        builder.row(
+            InlineKeyboardButton(text="Отметить выполненной", callback_data=f"admin_booking_status_{booking_id}_completed_{context}_{page}"),
+            InlineKeyboardButton(text="Отменить запись", callback_data=f"admin_booking_status_{booking_id}_cancelled_{context}_{page}"),
+        )
+    else:
+        builder.row(
+            InlineKeyboardButton(text="Вернуть в активные", callback_data=f"admin_booking_status_{booking_id}_scheduled_{context}_{page}")
+        )
+
+    builder.row(InlineKeyboardButton(text="Назад к списку", callback_data=f"bookings_page_{context}_{page}"))
     return builder.as_markup()

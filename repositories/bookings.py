@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from .base import _slot_overlaps, _time_to_minutes, _to_iso_date, aiosqlite, datetime
-from time_utils import build_reminder_schedule, combine_salon_datetime, get_salon_today
+from time_utils import build_reminder_schedule, combine_salon_datetime, get_salon_now, get_salon_today
 
 
 def _duration_from_range(start_time: str, end_time: str) -> int:
@@ -12,19 +12,58 @@ def _duration_from_range(start_time: str, end_time: str) -> int:
     return end_minutes - start_minutes
 
 
-async def add_booking(user_id, name, phone, date, time, duration=60, service_name=None, price=0):
-    date_iso = _to_iso_date(date)
+def _booking_datetime(date: str, time: str):
     booking_date = datetime.strptime(date, "%d.%m.%Y").date()
     booking_time = datetime.strptime(time, "%H:%M").time()
-    booking_dt = combine_salon_datetime(booking_date, booking_time)
+    return combine_salon_datetime(booking_date, booking_time)
+
+
+async def sync_completed_bookings() -> int:
+    now = get_salon_now()
+    updated = 0
+    async with aiosqlite.connect("bookings.db") as db:
+        async with db.execute(
+            """
+            SELECT id, date, time, duration
+            FROM bookings
+            WHERE status = 'scheduled'
+            """
+        ) as cursor:
+            rows = await cursor.fetchall()
+
+        for booking_id, date_str, time_str, duration in rows:
+            try:
+                booking_dt = _booking_datetime(date_str, time_str)
+            except ValueError:
+                continue
+            duration_minutes = int(duration or 60)
+            if booking_dt.timestamp() + duration_minutes * 60 <= now.timestamp():
+                await db.execute(
+                    """
+                    UPDATE bookings
+                    SET status = 'completed',
+                        completed_at = COALESCE(completed_at, ?)
+                    WHERE id = ? AND status = 'scheduled'
+                    """,
+                    (now.isoformat(), booking_id),
+                )
+                updated += 1
+        if updated:
+            await db.commit()
+    return updated
+
+
+async def add_booking(user_id, name, phone, date, time, duration=60, service_name=None, price=0):
+    date_iso = _to_iso_date(date)
+    booking_dt = _booking_datetime(date, time)
     schedule = build_reminder_schedule(booking_dt)
     async with aiosqlite.connect("bookings.db") as db:
         await db.execute(
             """
             INSERT INTO bookings (
                 user_id, name, phone, date, date_iso, time, duration, service_name, price,
-                created_at, first_reminder_due_at, second_reminder_due_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                created_at, first_reminder_due_at, second_reminder_due_at, status
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'scheduled')
             """,
             (
                 user_id, name, phone, date, date_iso, time, duration, service_name, price,
@@ -52,7 +91,10 @@ async def create_booking_if_available(
     async with aiosqlite.connect("bookings.db", timeout=30) as db:
         await db.execute("BEGIN IMMEDIATE")
 
-        async with db.execute("SELECT time, duration FROM bookings WHERE date = ?", (date,)) as cursor:
+        async with db.execute(
+            "SELECT time, duration FROM bookings WHERE date = ? AND status = 'scheduled'",
+            (date,),
+        ) as cursor:
             rows = await cursor.fetchall()
 
         for busy_time, busy_duration in rows:
@@ -64,16 +106,14 @@ async def create_booking_if_available(
                 await db.rollback()
                 return False
 
-        booking_date = datetime.strptime(date, "%d.%m.%Y").date()
-        booking_time = datetime.strptime(time, "%H:%M").time()
-        booking_dt = combine_salon_datetime(booking_date, booking_time)
+        booking_dt = _booking_datetime(date, time)
         schedule = build_reminder_schedule(booking_dt)
         await db.execute(
             """
             INSERT INTO bookings (
                 user_id, name, phone, date, date_iso, time, duration, service_name, price,
-                created_at, first_reminder_due_at, second_reminder_due_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                created_at, first_reminder_due_at, second_reminder_due_at, status
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'scheduled')
             """,
             (
                 user_id, name, phone, date, date_iso, time, duration, service_name, price,
@@ -86,14 +126,20 @@ async def create_booking_if_available(
 
 async def get_booked_slots(date):
     async with aiosqlite.connect("bookings.db") as db:
-        async with db.execute("SELECT time FROM bookings WHERE date = ?", (date,)) as cursor:
+        async with db.execute(
+            "SELECT time FROM bookings WHERE date = ? AND status = 'scheduled'",
+            (date,),
+        ) as cursor:
             rows = await cursor.fetchall()
         return [row[0] for row in rows]
 
 
 async def get_busy_slots_by_date(date: str):
     async with aiosqlite.connect("bookings.db") as db:
-        async with db.execute("SELECT time, duration FROM bookings WHERE date = ?", (date,)) as cursor:
+        async with db.execute(
+            "SELECT time, duration FROM bookings WHERE date = ? AND status = 'scheduled'",
+            (date,),
+        ) as cursor:
             rows = await cursor.fetchall()
         async with db.execute(
             "SELECT start_time, end_time FROM blocked_slots WHERE date = ? ORDER BY start_time",
@@ -118,6 +164,7 @@ async def get_all_bookings():
             """
             SELECT b.name, b.phone, b.date, b.time, b.price
             FROM bookings b
+            WHERE b.status != 'cancelled'
             ORDER BY COALESCE(b.date_iso, b.date), b.time
             """
         ) as cursor:
@@ -128,7 +175,7 @@ async def get_all_bookings_detailed():
     async with aiosqlite.connect("bookings.db") as db:
         async with db.execute(
             """
-            SELECT b.id, b.name, b.phone, b.date, b.time, b.price
+            SELECT b.id, b.name, b.phone, b.date, b.time, b.price, b.status
             FROM bookings b
             ORDER BY COALESCE(b.date_iso, b.date), b.time
             """
@@ -148,7 +195,7 @@ async def get_bookings_by_date_full(target_date: str):
             """
             SELECT b.name, b.phone, b.date, b.time, b.price
             FROM bookings b
-            WHERE b.date = ?
+            WHERE b.date = ? AND b.status != 'cancelled'
             ORDER BY b.time
             """,
             (target_date,),
@@ -160,7 +207,7 @@ async def get_bookings_by_date_detailed(target_date: str):
     async with aiosqlite.connect("bookings.db") as db:
         async with db.execute(
             """
-            SELECT b.id, b.name, b.phone, b.date, b.time, b.price
+            SELECT b.id, b.name, b.phone, b.date, b.time, b.price, b.status
             FROM bookings b
             WHERE b.date = ?
             ORDER BY b.time
@@ -173,7 +220,13 @@ async def get_bookings_by_date_detailed(target_date: str):
 async def get_user_booking(user_id: int):
     async with aiosqlite.connect("bookings.db") as db:
         async with db.execute(
-            "SELECT name, phone, date, time, id FROM bookings WHERE user_id = ? ORDER BY id DESC LIMIT 1",
+            """
+            SELECT name, phone, date, time, id
+            FROM bookings
+            WHERE user_id = ? AND status = 'scheduled'
+            ORDER BY id DESC
+            LIMIT 1
+            """,
             (user_id,),
         ) as cursor:
             return await cursor.fetchone()
@@ -183,14 +236,36 @@ async def get_user_bookings(user_id: int):
     async with aiosqlite.connect("bookings.db") as db:
         async with db.execute(
             """
-            SELECT id, name, phone, date, time
+            SELECT id, name, phone, date, time, status
             FROM bookings
-            WHERE user_id = ?
-            ORDER BY id DESC
+            WHERE user_id = ? AND status != 'cancelled'
+            ORDER BY
+                CASE status
+                    WHEN 'scheduled' THEN 0
+                    WHEN 'completed' THEN 1
+                    ELSE 2
+                END,
+                COALESCE(date_iso, date) DESC,
+                time DESC,
+                id DESC
             """,
             (user_id,),
         ) as cursor:
             return await cursor.fetchall()
+
+
+async def cancel_booking_by_id(booking_id: int):
+    async with aiosqlite.connect("bookings.db") as db:
+        await db.execute(
+            """
+            UPDATE bookings
+            SET status = 'cancelled',
+                cancelled_at = COALESCE(cancelled_at, ?)
+            WHERE id = ?
+            """,
+            (get_salon_now().isoformat(), booking_id),
+        )
+        await db.commit()
 
 
 async def delete_booking_by_id(booking_id: int):
@@ -203,7 +278,7 @@ async def get_booking_record_by_id(booking_id: int):
     async with aiosqlite.connect("bookings.db") as db:
         async with db.execute(
             """
-            SELECT id, user_id, name, phone, date, time
+            SELECT id, user_id, name, phone, date, time, status, duration
             FROM bookings
             WHERE id = ?
             """,
@@ -212,13 +287,53 @@ async def get_booking_record_by_id(booking_id: int):
             return await cursor.fetchone()
 
 
+async def update_booking_status(booking_id: int, status: str):
+    now_iso = get_salon_now().isoformat()
+    async with aiosqlite.connect("bookings.db") as db:
+        if status == "completed":
+            await db.execute(
+                """
+                UPDATE bookings
+                SET status = 'completed',
+                    completed_at = COALESCE(completed_at, ?),
+                    cancelled_at = NULL
+                WHERE id = ?
+                """,
+                (now_iso, booking_id),
+            )
+        elif status == "cancelled":
+            await db.execute(
+                """
+                UPDATE bookings
+                SET status = 'cancelled',
+                    cancelled_at = COALESCE(cancelled_at, ?),
+                    completed_at = NULL
+                WHERE id = ?
+                """,
+                (now_iso, booking_id),
+            )
+        else:
+            await db.execute(
+                """
+                UPDATE bookings
+                SET status = 'scheduled',
+                    completed_at = NULL,
+                    cancelled_at = NULL
+                WHERE id = ?
+                """,
+                (booking_id,),
+            )
+        await db.commit()
+
+
 async def get_due_first_reminders(now_iso: str):
     async with aiosqlite.connect("bookings.db") as db:
         async with db.execute(
             """
             SELECT id, user_id, name, date, time
             FROM bookings
-            WHERE first_reminder_due_at IS NOT NULL
+            WHERE status = 'scheduled'
+              AND first_reminder_due_at IS NOT NULL
               AND first_reminder_sent_at IS NULL
               AND first_reminder_due_at <= ?
             """,
@@ -233,7 +348,8 @@ async def get_due_second_reminders(now_iso: str):
             """
             SELECT id, user_id, name, date, time
             FROM bookings
-            WHERE second_reminder_due_at IS NOT NULL
+            WHERE status = 'scheduled'
+              AND second_reminder_due_at IS NOT NULL
               AND second_reminder_sent_at IS NULL
               AND second_reminder_due_at <= ?
             """,
@@ -246,7 +362,7 @@ async def get_booking_by_id(booking_id: int):
     async with aiosqlite.connect("bookings.db") as db:
         async with db.execute(
             """
-            SELECT name, phone, date, time, user_id
+            SELECT name, phone, date, time, user_id, status
             FROM bookings
             WHERE id = ?
             """,
@@ -371,7 +487,9 @@ async def get_all_busy_slots():
     from collections import defaultdict
 
     async with aiosqlite.connect("bookings.db") as db:
-        async with db.execute("SELECT date, time, duration FROM bookings") as cursor:
+        async with db.execute(
+            "SELECT date, time, duration FROM bookings WHERE status = 'scheduled'"
+        ) as cursor:
             rows = await cursor.fetchall()
         async with db.execute("SELECT date, start_time, end_time FROM blocked_slots") as cursor:
             blocked_rows = await cursor.fetchall()

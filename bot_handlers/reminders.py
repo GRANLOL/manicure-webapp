@@ -39,7 +39,7 @@ async def reminder_cancel_cb(callback: types.CallbackQuery):
         await callback.answer("Запись не найдена", show_alert=True)
         return
 
-    await database.delete_booking_by_id(booking_id)
+    await database.cancel_booking_by_id(booking_id)
     await callback.message.edit_reply_markup(reply_markup=None)
     await callback.message.answer("Ваша запись отменена. Будем рады видеть вас снова.")
 
@@ -63,7 +63,7 @@ async def reminder_resched_cb(callback: types.CallbackQuery):
         await callback.answer("Запись не найдена", show_alert=True)
         return
 
-    await database.delete_booking_by_id(booking_id)
+    await database.cancel_booking_by_id(booking_id)
     await callback.message.edit_reply_markup(reply_markup=None)
     await callback.message.answer("Предыдущая запись отменена. Откройте запись заново и выберите другое время.")
 

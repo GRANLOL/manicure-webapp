@@ -85,6 +85,18 @@ async def init_db():
             await db.execute("ALTER TABLE bookings ADD COLUMN price INTEGER DEFAULT 0")
         except aiosqlite.OperationalError:
             pass
+        try:
+            await db.execute("ALTER TABLE bookings ADD COLUMN status TEXT DEFAULT 'scheduled'")
+        except aiosqlite.OperationalError:
+            pass
+        try:
+            await db.execute("ALTER TABLE bookings ADD COLUMN completed_at TEXT")
+        except aiosqlite.OperationalError:
+            pass
+        try:
+            await db.execute("ALTER TABLE bookings ADD COLUMN cancelled_at TEXT")
+        except aiosqlite.OperationalError:
+            pass
         await db.execute("""
             CREATE TABLE IF NOT EXISTS time_slots (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -109,6 +121,7 @@ async def init_db():
               AND substr(date, 3, 1) = '.'
               AND substr(date, 6, 1) = '.'
         """)
+        await db.execute("UPDATE bookings SET status = 'scheduled' WHERE status IS NULL OR trim(status) = ''")
         async with db.execute("""
             SELECT id, date, time, reminder_level, created_at, first_reminder_due_at,
                    second_reminder_due_at, first_reminder_sent_at, second_reminder_sent_at
