@@ -42,6 +42,7 @@ async def system_settings_handler(message: types.Message):
 async def back_to_settings_callback(callback: types.CallbackQuery):
     if not _is_admin(callback.from_user.id):
         return
+    await callback.answer()
     await callback.message.edit_text("Настройки системы:", reply_markup=keyboards.get_system_settings_keyboard())
 
 
@@ -49,6 +50,7 @@ async def back_to_settings_callback(callback: types.CallbackQuery):
 async def settings_reminders_callback(callback: types.CallbackQuery):
     if not _is_admin(callback.from_user.id):
         return
+    await callback.answer()
     text = (
         "Настройки напоминаний:\n\n"
         "1. Первое уведомление за 24 часа\n"
@@ -99,7 +101,10 @@ async def process_rem_time_2(message: types.Message, state: FSMContext):
         if hours < 1 or hours > 23:
             raise ValueError
     except ValueError:
-        await message.answer("Пожалуйста, введите число от 1 до 23.", reply_markup=keyboards.get_cancel_admin_action_keyboard())
+        await message.answer(
+            "Пожалуйста, введите число от 1 до 23.",
+            reply_markup=keyboards.get_cancel_admin_action_keyboard("back_to_settings", "◀️ В настройки"),
+        )
         return
 
     update_config("reminder_2_hours", hours)
@@ -127,7 +132,10 @@ async def process_timezone_offset(message: types.Message, state: FSMContext):
         if not (-12 <= offset <= 14):
             raise ValueError
     except ValueError:
-        await message.answer("Пожалуйста, введите число от -12 до 14.")
+        await message.answer(
+            "Пожалуйста, введите число от -12 до 14.",
+            reply_markup=keyboards.get_cancel_admin_action_keyboard("back_to_settings", "◀️ В настройки"),
+        )
         return
 
     update_config("timezone_offset", offset)
@@ -142,6 +150,7 @@ async def process_timezone_offset(message: types.Message, state: FSMContext):
 async def settings_currency_callback(callback: types.CallbackQuery):
     if not _is_admin(callback.from_user.id):
         return
+    await callback.answer()
     current_symbol = get_currency_symbol()
     await callback.message.edit_text(
         f"Текущая валюта: {current_symbol}\nВыберите символ или введите свой.",
@@ -170,7 +179,10 @@ async def set_currency_callback(callback: types.CallbackQuery, state: FSMContext
 async def process_currency_symbol(message: types.Message, state: FSMContext):
     symbol = (message.text or "").strip()
     if not symbol or len(symbol) > 8:
-        await message.answer("Введите короткий символ валюты до 8 символов.")
+        await message.answer(
+            "Введите короткий символ валюты до 8 символов.",
+            reply_markup=keyboards.get_cancel_admin_action_keyboard("back_to_settings", "◀️ В настройки"),
+        )
         return
     update_config("currency_symbol", symbol)
     await state.clear()
@@ -191,6 +203,7 @@ async def manage_schedule_handler(message: types.Message):
 async def back_to_schedule_callback(callback: types.CallbackQuery, state: FSMContext):
     if not _is_admin(callback.from_user.id):
         return
+    await callback.answer()
     await state.clear()
     await callback.message.edit_text(
         "Настройка графика работы:\nВыберите рабочие дни и управляйте блокировками.",
@@ -213,6 +226,7 @@ async def toggle_day_callback(callback: types.CallbackQuery):
 
     update_config("working_days", working_days)
     await callback.message.edit_reply_markup(reply_markup=_schedule_markup())
+    await callback.answer()
 
 
 @router.callback_query(F.data == "add_blacklist_date")
@@ -252,12 +266,14 @@ async def del_blacklist_date_callback(callback: types.CallbackQuery):
         update_config("blacklisted_dates", blacklisted_dates)
 
     await callback.message.edit_reply_markup(reply_markup=_schedule_markup())
+    await callback.answer()
 
 
 @router.callback_query(F.data == "manage_blocked_slots")
 async def manage_blocked_slots_callback(callback: types.CallbackQuery):
     if not _is_admin(callback.from_user.id):
         return
+    await callback.answer()
     blocked_slots = await database.get_blocked_slots()
     text = "Блокировки времени:\n\nДобавляйте обед, технические окна и срочные ограничения."
     await callback.message.edit_text(text, reply_markup=keyboards.get_blocked_slots_keyboard(blocked_slots))
@@ -276,7 +292,10 @@ async def add_blocked_slot_callback(callback: types.CallbackQuery, state: FSMCon
 async def process_blocked_slot_date(message: types.Message, state: FSMContext):
     value = message.text.strip()
     if not re.match(r"^\d{2}\.\d{2}\.\d{4}$", value):
-        await message.answer("Неверный формат даты. Используйте ДД.ММ.ГГГГ.")
+        await message.answer(
+            "Неверный формат даты. Используйте ДД.ММ.ГГГГ.",
+            reply_markup=keyboards.get_cancel_admin_action_keyboard("back_to_schedule", "◀️ К графику"),
+        )
         return
     await state.update_data(date=value)
     await state.set_state(AddBlockedSlotForm.start_time)
@@ -287,7 +306,10 @@ async def process_blocked_slot_date(message: types.Message, state: FSMContext):
 async def process_blocked_slot_start(message: types.Message, state: FSMContext):
     value = message.text.strip()
     if not re.match(r"^\d{2}:\d{2}$", value):
-        await message.answer("Неверный формат времени. Используйте ЧЧ:ММ.")
+        await message.answer(
+            "Неверный формат времени. Используйте ЧЧ:ММ.",
+            reply_markup=keyboards.get_cancel_admin_action_keyboard("back_to_schedule", "◀️ К графику"),
+        )
         return
     await state.update_data(start_time=value)
     await state.set_state(AddBlockedSlotForm.end_time)
@@ -298,7 +320,10 @@ async def process_blocked_slot_start(message: types.Message, state: FSMContext):
 async def process_blocked_slot_end(message: types.Message, state: FSMContext):
     value = message.text.strip()
     if not re.match(r"^\d{2}:\d{2}$", value):
-        await message.answer("Неверный формат времени. Используйте ЧЧ:ММ.")
+        await message.answer(
+            "Неверный формат времени. Используйте ЧЧ:ММ.",
+            reply_markup=keyboards.get_cancel_admin_action_keyboard("back_to_schedule", "◀️ К графику"),
+        )
         return
     data = await state.get_data()
     start_time = data["start_time"]
@@ -308,7 +333,10 @@ async def process_blocked_slot_end(message: types.Message, state: FSMContext):
         if end_dt <= start_dt:
             raise ValueError
     except ValueError:
-        await message.answer("Время окончания должно быть позже времени начала.")
+        await message.answer(
+            "Время окончания должно быть позже времени начала.",
+            reply_markup=keyboards.get_cancel_admin_action_keyboard("back_to_schedule", "◀️ К графику"),
+        )
         return
     await state.update_data(end_time=value)
     await state.set_state(AddBlockedSlotForm.reason)
@@ -341,6 +369,7 @@ async def delete_blocked_slot_callback(callback: types.CallbackQuery):
     await database.delete_blocked_slot(blocked_slot_id)
     blocked_slots = await database.get_blocked_slots()
     await callback.message.edit_reply_markup(reply_markup=keyboards.get_blocked_slots_keyboard(blocked_slots))
+    await callback.answer()
 
 
 @router.message(F.text == "🗓 Окно брони")
@@ -362,7 +391,10 @@ async def process_booking_window(message: types.Message, state: FSMContext):
         if days < 1 or days > 365:
             raise ValueError
     except ValueError:
-        await message.answer("Пожалуйста, введите корректное число от 1 до 365.")
+        await message.answer(
+            "Пожалуйста, введите корректное число от 1 до 365.",
+            reply_markup=keyboards.get_cancel_admin_action_keyboard("back_to_settings", "◀️ В настройки"),
+        )
         return
     update_config("booking_window", days)
     await state.clear()
@@ -414,7 +446,10 @@ async def process_schedule_interval(message: types.Message, state: FSMContext):
         if val <= 0:
             raise ValueError
     except ValueError:
-        await message.answer("Пожалуйста, введите положительное число минут.")
+        await message.answer(
+            "Пожалуйста, введите положительное число минут.",
+            reply_markup=keyboards.get_cancel_admin_action_keyboard("back_to_settings", "◀️ В настройки"),
+        )
         return
 
     update_config("schedule_interval", val)

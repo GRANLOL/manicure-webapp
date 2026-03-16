@@ -112,6 +112,7 @@ def get_select_category_keyboard(categories):
         builder.row(InlineKeyboardButton(text=f"{prefix}{name[:20]}", callback_data=f"sel_cat_{category_id}"))
 
     builder.row(InlineKeyboardButton(text="Без категории", callback_data="sel_cat_0"))
+    builder.row(InlineKeyboardButton(text="❌ Отмена", callback_data="cancel_admin_action"))
     return builder.as_markup()
 
 
@@ -127,6 +128,7 @@ def get_parent_category_keyboard(categories):
         builder.row(InlineKeyboardButton(text=f"{prefix}{name[:20]}", callback_data=f"sel_parent_{category_id}"))
 
     builder.row(InlineKeyboardButton(text="Сделать основной (без родителя)", callback_data="sel_parent_0"))
+    builder.row(InlineKeyboardButton(text="❌ Отмена", callback_data="cancel_admin_action"))
     return builder.as_markup()
 
 
@@ -162,4 +164,5 @@ def get_free_services_keyboard(free_services, selected_ids):
         builder.row(InlineKeyboardButton(text=f"{prefix}{service_name}", callback_data=f"toggle_srv_{service_id}"))
 
     builder.row(InlineKeyboardButton(text="Завершить выбор", callback_data="finish_service_selection"))
+    builder.row(InlineKeyboardButton(text="❌ Отмена", callback_data="cancel_admin_action"))
     return builder.as_markup()

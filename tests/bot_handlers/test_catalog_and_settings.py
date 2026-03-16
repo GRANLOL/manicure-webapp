@@ -132,9 +132,10 @@ class SettingsHandlerTests(unittest.IsolatedAsyncioTestCase):
         message = make_message(text="0")
         state = make_state()
 
-        await settings_handlers.process_booking_window(message, state)
+        with patch.object(settings_handlers.keyboards, "get_cancel_admin_action_keyboard", return_value="kb"):
+            await settings_handlers.process_booking_window(message, state)
 
-        message.answer.assert_awaited_once_with(ANY)
+        message.answer.assert_awaited_once_with(ANY, reply_markup="kb")
         state.clear.assert_not_awaited()
 
     async def test_process_working_hours_rejects_invalid_format(self):

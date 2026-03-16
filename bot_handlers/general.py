@@ -292,6 +292,7 @@ async def bookings_page_callback(callback: types.CallbackQuery):
     admin_id = getenv("ADMIN_ID")
     if not admin_id or str(callback.from_user.id) != admin_id:
         return
+    await callback.answer()
     _, _, context, page_str = callback.data.split("_", 3)
     await _show_booking_list(callback, context=context, page=int(page_str))
 
@@ -301,6 +302,7 @@ async def booking_actions_callback(callback: types.CallbackQuery):
     admin_id = getenv("ADMIN_ID")
     if not admin_id or str(callback.from_user.id) != admin_id:
         return
+    await callback.answer()
     _, _, context, page_str, booking_id_str = callback.data.split("_", 4)
     booking = await database.get_booking_record_by_id(int(booking_id_str))
     if not booking:
