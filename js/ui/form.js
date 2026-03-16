@@ -1,27 +1,78 @@
 import { tg } from '../telegram.js';
 import { store } from '../store.js';
-import { config } from '../config.js';
 import { showModal } from './modal.js';
+import { showToast } from './toast.js';
+
+const bookingButton = document.getElementById('booking-submit-btn');
+
+function notifyHaptic(type, level) {
+    if (!tg.HapticFeedback) {
+        return;
+    }
+
+    if (type === 'notification') {
+        tg.HapticFeedback.notificationOccurred(level);
+        return;
+    }
+
+    tg.HapticFeedback.impactOccurred(level);
+}
+
+export function getFormIssues() {
+    const nameInput = document.getElementById('name-input');
+    const phoneInput = document.getElementById('phone-input');
+    const digitsOnly = phoneInput.value.replace(/\D/g, '');
+    const issues = [];
+
+    if (!store.selectedService) {
+        issues.push({ field: 'service', message: 'Выберите услугу.' });
+    }
+    if (!store.selectedDate) {
+        issues.push({ field: 'date', message: 'Выберите дату.' });
+    }
+    if (!store.selectedTime) {
+        issues.push({ field: 'time', message: 'Выберите время.' });
+    }
+    if (nameInput.value.trim().length === 0) {
+        issues.push({ field: 'name', message: 'Укажите имя.' });
+    }
+    if (digitsOnly.length < 11) {
+        issues.push({ field: 'phone', message: 'Введите корректный номер телефона.' });
+    }
+
+    return issues;
+}
 
 export function checkConfirmation() {
-    const phoneInput = document.getElementById('phone-input');
-    const nameInput = document.getElementById('name-input');
+    const issues = getFormIssues();
 
-    const digitsOnly = phoneInput.value.replace(/\D/g, '');
-    const isPhoneValid = digitsOnly.length >= 11;
-    const isNameValid = nameInput.value.trim().length > 0;
+    if (!bookingButton) {
+        return;
+    }
 
-    if (store.selectedService && store.selectedDate && store.selectedTime && isPhoneValid && isNameValid) {
-        if (tg.MainButton) {
-            tg.MainButton.text = "ПОДТВЕРДИТЬ ЗАПИСЬ";
-            tg.MainButton.color = config.themeColors.mainButtonColor;
-            tg.MainButton.textColor = config.themeColors.mainButtonTextColor;
-            tg.MainButton.show();
-            tg.MainButton.offClick(showModal);
-            tg.MainButton.onClick(showModal);
-        }
-    } else if (tg.MainButton) {
-        tg.MainButton.hide();
+    const isValid = issues.length === 0;
+    bookingButton.classList.toggle('is-disabled', !isValid);
+    bookingButton.classList.toggle('is-ready', isValid);
+    bookingButton.setAttribute('aria-disabled', String(!isValid));
+}
+
+function focusField(field) {
+    const map = {
+        service: document.getElementById('select-trigger'),
+        date: document.getElementById('date-container'),
+        time: document.getElementById('time-grid'),
+        name: document.getElementById('name-input'),
+        phone: document.getElementById('phone-input'),
+    };
+
+    const target = map[field];
+    if (!target) {
+        return;
+    }
+
+    target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    if (typeof target.focus === 'function') {
+        target.focus({ preventScroll: true });
     }
 }
 
@@ -29,12 +80,31 @@ export function initFormListeners() {
     const nameInput = document.getElementById('name-input');
     const phoneInput = document.getElementById('phone-input');
 
+    if (bookingButton) {
+        bookingButton.addEventListener('click', () => {
+            const issues = getFormIssues();
+            if (issues.length > 0) {
+                notifyHaptic('notification', 'warning');
+                showToast({
+                    title: 'Не хватает данных',
+                    message: issues[0].message,
+                    variant: 'neutral',
+                });
+                focusField(issues[0].field);
+                return;
+            }
+
+            notifyHaptic('impact', 'medium');
+            showModal();
+        });
+    }
+
     nameInput.addEventListener('input', () => {
         checkConfirmation();
     });
 
     phoneInput.addEventListener('input', (e) => {
-        tg.HapticFeedback.impactOccurred('light');
+        notifyHaptic('impact', 'light');
 
         let input = e.target.value.replace(/\D/g, '');
         if (input.length > 0 && input[0] === '8') {
@@ -66,4 +136,6 @@ export function initFormListeners() {
         e.target.value = formatted;
         checkConfirmation();
     });
+
+    checkConfirmation();
 }

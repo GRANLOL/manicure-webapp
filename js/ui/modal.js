@@ -1,6 +1,7 @@
 import { tg } from '../telegram.js';
 import { store } from '../store.js';
 import { submitData } from './submit.js';
+import { checkConfirmation } from './form.js';
 
 const modal = document.getElementById('confirm-modal');
 const modalService = document.getElementById('modal-service');
@@ -17,7 +18,9 @@ export function initModal() {
 }
 
 export function showModal() {
-    tg.HapticFeedback.impactOccurred('medium');
+    if (tg.HapticFeedback) {
+        tg.HapticFeedback.impactOccurred('medium');
+    }
 
     const nameInput = document.getElementById('name-input');
     const phoneInput = document.getElementById('phone-input');
@@ -30,12 +33,13 @@ export function showModal() {
         modalPhone.textContent = phoneInput.value;
 
         modal.classList.add('active');
-        tg.MainButton.hide();
     }, 0);
 }
 
 export function hideModal() {
-    tg.HapticFeedback.impactOccurred('light');
+    if (tg.HapticFeedback) {
+        tg.HapticFeedback.impactOccurred('light');
+    }
     modal.classList.remove('active');
-    tg.MainButton.show();
+    checkConfirmation();
 }

@@ -138,8 +138,7 @@ body {
 /* --- Main Content Area --- */
 .container {
     flex: 1;
-    padding: 24px 20px 100px 20px;
-    /* Bottom padding for Telegram button */
+    padding: 24px 20px 156px 20px;
     display: flex;
     flex-direction: column;
     gap: 28px;

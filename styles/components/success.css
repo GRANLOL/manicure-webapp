@@ -109,8 +109,10 @@
     font-size: 14px;
     margin-bottom: 12px;
     color: var(--text-muted);
-    display: flex;
-    justify-content: space-between;
+    display: grid;
+    grid-template-columns: minmax(78px, 98px) minmax(0, 1fr);
+    align-items: start;
+    gap: 8px 16px;
     border-bottom: 1px dashed var(--border-color);
     padding-bottom: 8px;
 }
@@ -124,4 +126,14 @@
 .success-summary span {
     font-weight: 600;
     color: var(--text-color);
+    text-align: right;
+    min-width: 0;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
+
+.success-summary .summary-label {
+    color: var(--text-muted);
+    font-weight: 500;
+    text-align: left;
 }

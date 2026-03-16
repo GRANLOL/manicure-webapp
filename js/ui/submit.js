@@ -1,6 +1,8 @@
 import { tg } from '../telegram.js';
 import { store } from '../store.js';
 import { config } from '../config.js';
+import { getFormIssues } from './form.js';
+import { showToast } from './toast.js';
 
 async function postBooking(data) {
     const headers = {
@@ -26,12 +28,20 @@ async function postBooking(data) {
 }
 
 export async function submitData() {
-    tg.HapticFeedback.impactOccurred('medium');
-    if (!store.selectedService || !store.selectedDate || !store.selectedTime) {
+    if (tg.HapticFeedback) {
+        tg.HapticFeedback.impactOccurred('medium');
+    }
+
+    const issues = getFormIssues();
+    if (issues.length > 0) {
+        showToast({
+            title: 'Проверьте форму',
+            message: issues[0].message,
+            variant: 'neutral',
+        });
         return;
     }
 
-    tg.MainButton.showProgress();
     const modalSubmit = document.getElementById('modal-submit');
     const modal = document.getElementById('confirm-modal');
     const successScreen = document.getElementById('success-screen');
@@ -42,7 +52,7 @@ export async function submitData() {
     const nameInput = document.getElementById('name-input');
 
     modalSubmit.disabled = true;
-    modalSubmit.textContent = 'Секунду...';
+    modalSubmit.textContent = 'Подтверждаем...';
 
     const data = {
         service: store.selectedService,
@@ -58,7 +68,6 @@ export async function submitData() {
         await postBooking(data);
 
         modal.classList.remove('active');
-        tg.MainButton.hide();
 
         successService.textContent = store.selectedService;
         successDate.textContent =
@@ -68,7 +77,9 @@ export async function submitData() {
         successTime.textContent = store.selectedTime;
 
         successScreen.classList.add('active');
-        tg.HapticFeedback.notificationOccurred('success');
+        if (tg.HapticFeedback) {
+            tg.HapticFeedback.notificationOccurred('success');
+        }
 
         requestAnimationFrame(() => {
             requestAnimationFrame(() => {
@@ -83,13 +94,17 @@ export async function submitData() {
         }, 1800);
     } catch (error) {
         console.error('Booking submit failed:', error);
-        tg.HapticFeedback.notificationOccurred('error');
-        alert(error.message || 'Не удалось оформить запись.');
+        if (tg.HapticFeedback) {
+            tg.HapticFeedback.notificationOccurred('error');
+        }
+        showToast({
+            title: 'Не удалось оформить запись',
+            message: error.message || 'Попробуйте еще раз.',
+            variant: 'neutral',
+            duration: 2800,
+        });
     } finally {
         modalSubmit.disabled = false;
-        modalSubmit.textContent = 'Записаться';
-        if (tg.MainButton.hideProgress) {
-            tg.MainButton.hideProgress();
-        }
+        modalSubmit.textContent = 'Подтвердить запись';
     }
 }

@@ -5,6 +5,7 @@ import { populateServices, initServiceListeners } from './ui/services.js';
 import { generateDates, generateTimes } from './ui/datetime.js';
 import { initFormListeners } from './ui/form.js';
 import { initModal } from './ui/modal.js';
+import './ui/toast.js';
 
 // --- A. Configuration Injection ---
 document.getElementById('salon-name-display').textContent = config.salonName;
