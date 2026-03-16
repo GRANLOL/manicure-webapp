@@ -110,7 +110,7 @@ def format_user_booking_text(name: str, phone: str, date: str, time: str, status
     safe_date = escape(date)
     safe_time = escape(time)
     safe_status = escape(get_booking_status_label(status))
-    text = "Вашa запись:\n\n"
+    text = "Ваша запись:\n\n"
     text += f"Статус: {safe_status}\n"
     text += f"Имя/Услуга: {safe_name}\n"
     text += f"Дата: {safe_date}\n"
