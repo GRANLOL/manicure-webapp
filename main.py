@@ -1,6 +1,6 @@
 import asyncio
 import logging
-import sys
+from contextlib import asynccontextmanager
 
 from aiogram import Bot, Dispatcher
 from aiogram.types import BotCommand
@@ -20,7 +20,15 @@ from webapp_security import allowed_origins, get_init_data_validation_error, get
 configure_logging()
 logger = logging.getLogger(__name__)
 
-app = FastAPI()
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    await init_db()
+    logger.info("Database initialized.")
+    yield
+
+
+app = FastAPI(lifespan=lifespan)
 app.state.bot = None
 
 app.add_middleware(
@@ -44,13 +52,6 @@ def require_webapp_auth(x_telegram_init_data: str | None) -> None:
             len(x_telegram_init_data or ""),
         )
         raise HTTPException(status_code=401, detail="Unauthorized")
-
-
-@app.on_event("startup")
-async def startup_event() -> None:
-    await init_db()
-    logger.info("Database initialized.")
-
 
 @app.get("/api/health")
 async def healthcheck() -> dict:
