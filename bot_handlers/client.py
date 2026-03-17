@@ -189,6 +189,7 @@ async def price_page_cb(callback: types.CallbackQuery):
     try:
         page = int(page_str)
     except ValueError:
+        await callback.answer()
         return
 
     services = await database.get_all_services()
@@ -196,6 +197,7 @@ async def price_page_cb(callback: types.CallbackQuery):
         await callback.answer("Прайс-лист пуст", show_alert=True)
         return
 
+    await callback.answer()
     text, total_pages = format_price_list_page(services, page=page, page_size=25)
     await callback.message.edit_text(
         text,
