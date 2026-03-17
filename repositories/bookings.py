@@ -301,6 +301,17 @@ async def update_booking_status(booking_id: int, status: str):
                 """,
                 (now_iso, booking_id),
             )
+        elif status == "no_show":
+            await db.execute(
+                """
+                UPDATE bookings
+                SET status = 'no_show',
+                    completed_at = NULL,
+                    cancelled_at = NULL
+                WHERE id = ?
+                """,
+                (booking_id,),
+            )
         elif status == "cancelled":
             await db.execute(
                 """
@@ -326,11 +337,91 @@ async def update_booking_status(booking_id: int, status: str):
         await db.commit()
 
 
+async def reschedule_booking_if_available(booking_id: int, date: str, time: str) -> bool:
+    slot_start = _time_to_minutes(time)
+    date_iso = _to_iso_date(date)
+    if slot_start is None:
+        return False
+
+    async with aiosqlite.connect("bookings.db", timeout=30) as db:
+        await db.execute("BEGIN IMMEDIATE")
+
+        async with db.execute(
+            """
+            SELECT duration, status
+            FROM bookings
+            WHERE id = ?
+            """,
+            (booking_id,),
+        ) as cursor:
+            booking_row = await cursor.fetchone()
+
+        if not booking_row:
+            await db.rollback()
+            return False
+
+        duration, status = booking_row
+        if status != "scheduled":
+            await db.rollback()
+            return False
+
+        normalized_duration = int(duration or 60)
+
+        async with db.execute(
+            """
+            SELECT id, time, duration
+            FROM bookings
+            WHERE date = ? AND status = 'scheduled' AND id != ?
+            """,
+            (date, booking_id),
+        ) as cursor:
+            rows = await cursor.fetchall()
+
+        for _busy_booking_id, busy_time, busy_duration in rows:
+            busy_start = _time_to_minutes(busy_time)
+            if busy_start is None:
+                continue
+            if _slot_overlaps(slot_start, normalized_duration, busy_start, int(busy_duration or 60)):
+                await db.rollback()
+                return False
+
+        booking_dt = _booking_datetime(date, time)
+        schedule = build_reminder_schedule(booking_dt)
+        await db.execute(
+            """
+            UPDATE bookings
+            SET date = ?,
+                date_iso = ?,
+                time = ?,
+                status = 'scheduled',
+                completed_at = NULL,
+                cancelled_at = NULL,
+                created_at = ?,
+                first_reminder_due_at = ?,
+                second_reminder_due_at = ?,
+                first_reminder_sent_at = NULL,
+                second_reminder_sent_at = NULL
+            WHERE id = ?
+            """,
+            (
+                date,
+                date_iso,
+                time,
+                schedule["created_at"],
+                schedule["first_reminder_due_at"],
+                schedule["second_reminder_due_at"],
+                booking_id,
+            ),
+        )
+        await db.commit()
+        return True
+
+
 async def get_due_first_reminders(now_iso: str):
     async with aiosqlite.connect("bookings.db") as db:
         async with db.execute(
             """
-            SELECT id, user_id, name, date, time
+            SELECT id, user_id, name, date, time, first_reminder_due_at
             FROM bookings
             WHERE status = 'scheduled'
               AND first_reminder_due_at IS NOT NULL
@@ -346,7 +437,7 @@ async def get_due_second_reminders(now_iso: str):
     async with aiosqlite.connect("bookings.db") as db:
         async with db.execute(
             """
-            SELECT id, user_id, name, date, time
+            SELECT id, user_id, name, date, time, second_reminder_due_at
             FROM bookings
             WHERE status = 'scheduled'
               AND second_reminder_due_at IS NOT NULL
@@ -369,6 +460,25 @@ async def get_booking_by_id(booking_id: int):
             (booking_id,),
         ) as cursor:
             return await cursor.fetchone()
+
+
+async def search_bookings(query: str, limit: int = 10):
+    like_query = f"%{query.strip()}%"
+    async with aiosqlite.connect("bookings.db") as db:
+        async with db.execute(
+            """
+            SELECT id, name, phone, date, time, status
+            FROM bookings
+            WHERE name LIKE ?
+               OR phone LIKE ?
+               OR date LIKE ?
+               OR time LIKE ?
+            ORDER BY COALESCE(date_iso, date) DESC, time DESC, id DESC
+            LIMIT ?
+            """,
+            (like_query, like_query, like_query, like_query, int(limit)),
+        ) as cursor:
+            return await cursor.fetchall()
 
 
 async def mark_first_reminder_sent(booking_id: int, sent_at: str):
