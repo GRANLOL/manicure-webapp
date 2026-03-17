@@ -27,6 +27,7 @@ async def clear_today_cb(callback: types.CallbackQuery):
     admin_id = getenv("ADMIN_ID")
     if not admin_id or str(callback.from_user.id) != admin_id:
         return
+    await callback.answer()
     await callback.message.edit_text(
         "⚠️ <b>Подтверждение</b>\n\nУдалить <b>все записи за сегодня</b>?",
         parse_mode="HTML",
@@ -39,6 +40,7 @@ async def clear_past_cb(callback: types.CallbackQuery):
     admin_id = getenv("ADMIN_ID")
     if not admin_id or str(callback.from_user.id) != admin_id:
         return
+    await callback.answer()
     await callback.message.edit_text(
         "⚠️ <b>Подтверждение</b>\n\nУдалить все <b>прошедшие записи</b>?",
         parse_mode="HTML",
@@ -51,6 +53,7 @@ async def clear_all_cb(callback: types.CallbackQuery):
     admin_id = getenv("ADMIN_ID")
     if not admin_id or str(callback.from_user.id) != admin_id:
         return
+    await callback.answer()
     await callback.message.edit_text(
         "⚠️ <b>Подтверждение</b>\n\nУдалить <b>все записи</b> из базы?",
         parse_mode="HTML",
@@ -63,6 +66,7 @@ async def clear_date_cb(callback: types.CallbackQuery, state: FSMContext):
     admin_id = getenv("ADMIN_ID")
     if not admin_id or str(callback.from_user.id) != admin_id:
         return
+    await callback.answer()
     await state.set_state(ClearBookingsForm.waiting_for_date)
     await callback.message.edit_text(
         "📅 <b>Очистка по дате</b>\n\nВведите дату в формате <code>ДД.ММ.ГГГГ</code>.",
@@ -90,6 +94,7 @@ async def clear_period_cb(callback: types.CallbackQuery, state: FSMContext):
     admin_id = getenv("ADMIN_ID")
     if not admin_id or str(callback.from_user.id) != admin_id:
         return
+    await callback.answer()
     await state.set_state(ClearBookingsForm.waiting_for_period_start)
     await callback.message.edit_text(
         "📆 <b>Очистка по периоду</b>\n\nВведите <b>начальную дату</b> в формате <code>ДД.ММ.ГГГГ</code>.",
@@ -137,6 +142,7 @@ async def confirm_clear_cb(callback: types.CallbackQuery):
     if not admin_id or str(callback.from_user.id) != admin_id:
         return
 
+    await callback.answer()
     parts = callback.data.split("_", 3)
     action = parts[2]
     payload = parts[3] if len(parts) > 3 else ""

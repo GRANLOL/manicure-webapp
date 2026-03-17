@@ -257,6 +257,7 @@ async def back_to_admin_menu_callback(callback: types.CallbackQuery, state):
     admin_id = getenv("ADMIN_ID")
     if not admin_id or str(callback.from_user.id) != admin_id:
         return
+    await callback.answer()
     await state.clear()
     try:
         await callback.message.delete()
@@ -274,6 +275,7 @@ async def cancel_admin_action_callback(callback: types.CallbackQuery, state):
     admin_id = getenv("ADMIN_ID")
     if not admin_id or str(callback.from_user.id) != admin_id:
         return
+    await callback.answer()
     await state.clear()
     await callback.message.delete()
 

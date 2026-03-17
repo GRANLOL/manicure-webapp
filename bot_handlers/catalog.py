@@ -61,6 +61,7 @@ async def del_service_callback(callback: types.CallbackQuery):
     admin_id = getenv("ADMIN_ID")
     if not admin_id or str(callback.from_user.id) != admin_id:
         return
+    await callback.answer()
     srv_id = int(callback.data.split("_")[2])
     await database.delete_service(srv_id)
     services = await database.get_all_services()
@@ -88,6 +89,7 @@ async def edit_service_callback(callback: types.CallbackQuery, state: FSMContext
 
 @router.callback_query(F.data == "back_to_services")
 async def back_to_services_callback(callback: types.CallbackQuery, state: FSMContext):
+    await callback.answer()
     data = await state.get_data()
     page = data.get("services_page", 0)
     await state.clear()
@@ -192,6 +194,7 @@ async def eds_cat_callback(callback: types.CallbackQuery, state: FSMContext):
 
 @router.callback_query(EditServiceForm.category_id, F.data.startswith("sel_cat_"))
 async def process_edit_service_cat(callback: types.CallbackQuery, state: FSMContext):
+    await callback.answer()
     cat_id = int(callback.data.split("_")[2])
     if cat_id == 0:
         cat_id = None
@@ -223,6 +226,7 @@ async def del_category_callback(callback: types.CallbackQuery):
     admin_id = getenv("ADMIN_ID")
     if not admin_id or str(callback.from_user.id) != admin_id:
         return
+    await callback.answer()
     cat_id = int(callback.data.split("_")[2])
     await database.delete_category(cat_id)
     categories = await database.get_all_categories()
@@ -248,6 +252,7 @@ async def edit_category_callback(callback: types.CallbackQuery):
 
 @router.callback_query(F.data == "back_to_categories")
 async def back_to_categories_callback(callback: types.CallbackQuery, state: FSMContext):
+    await callback.answer()
     await state.clear()
     categories = await database.get_all_categories()
     if not categories:
@@ -283,6 +288,7 @@ async def move_category_callback(callback: types.CallbackQuery, state: FSMContex
     if not admin_id or str(callback.from_user.id) != admin_id:
         return
 
+    await callback.answer()
     cat_id = int(callback.data.split("_")[2])
     categories = await database.get_all_categories()
 
@@ -364,6 +370,7 @@ async def process_wizard_main_name(message: types.Message, state: FSMContext):
 
 @router.callback_query(F.data.startswith("wiz_addsub_"))
 async def wizard_add_sub(callback: types.CallbackQuery, state: FSMContext):
+    await callback.answer()
     main_id = int(callback.data.split("_")[2])
     cat = await database.get_category_by_id(main_id)
     main_name = cat['name'] if cat else 'Основная категория'
@@ -409,6 +416,7 @@ async def process_wizard_sub_name(message: types.Message, state: FSMContext):
 
 @router.callback_query(F.data.startswith("wiz_attach_"))
 async def wizard_attach_services(callback: types.CallbackQuery, state: FSMContext):
+    await callback.answer()
     target_id = int(callback.data.split("_")[2])
 
     all_services = await database.get_all_services()
@@ -430,6 +438,7 @@ async def wizard_attach_services(callback: types.CallbackQuery, state: FSMContex
 
 @router.callback_query(F.data.startswith("wiz_addsrv_"))
 async def wizard_add_service(callback: types.CallbackQuery, state: FSMContext):
+    await callback.answer()
     target_id = int(callback.data.split("_")[2])
     cat = await database.get_category_by_id(target_id)
     if not cat:
@@ -505,6 +514,7 @@ async def process_wizard_service_duration(message: types.Message, state: FSMCont
 
 @router.callback_query(F.data == "wiz_finish")
 async def wizard_finish(callback: types.CallbackQuery, state: FSMContext):
+    await callback.answer()
     await state.clear()
     categories = await database.get_all_categories()
 
@@ -530,6 +540,7 @@ async def add_subcategory_existing(callback: types.CallbackQuery, state: FSMCont
 
 @router.callback_query(AddSubcategoryExistingForm.parent_id, F.data.startswith("sel_parent_"))
 async def process_subcat_parent(callback: types.CallbackQuery, state: FSMContext):
+    await callback.answer()
     parent_id = int(callback.data.split("_")[2])
     if parent_id == 0:
         parent_id = None
@@ -580,6 +591,7 @@ async def process_subcat_name(message: types.Message, state: FSMContext):
 
 @router.callback_query(F.data.startswith("toggle_srv_"))
 async def toggle_service_selection(callback: types.CallbackQuery, state: FSMContext):
+    await callback.answer()
     srv_id = int(callback.data.split("_")[2])
     data = await state.get_data()
     selected = data.get('selected_services', [])
@@ -596,6 +608,7 @@ async def toggle_service_selection(callback: types.CallbackQuery, state: FSMCont
 
 @router.callback_query(F.data == "finish_service_selection")
 async def finish_service_selection(callback: types.CallbackQuery, state: FSMContext):
+    await callback.answer()
     data = await state.get_data()
     new_cat_id = data.get('new_category_id')
     selected = data.get('selected_services', [])
@@ -631,6 +644,7 @@ async def add_service_callback(callback: types.CallbackQuery, state: FSMContext)
 
 @router.callback_query(AddServiceForm.category_id, F.data.startswith("sel_cat_"))
 async def process_service_category(callback: types.CallbackQuery, state: FSMContext):
+    await callback.answer()
     cat_id = int(callback.data.split("_")[2])
     cat_val = cat_id if cat_id > 0 else None
     await state.update_data(category_id=cat_val)

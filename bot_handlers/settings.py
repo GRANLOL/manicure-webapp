@@ -117,6 +117,7 @@ async def settings_timezone_callback(callback: types.CallbackQuery, state: FSMCo
     if not _is_admin(callback.from_user.id):
         return
 
+    await callback.answer()
     current_tz = salon_config.get("timezone_offset", 3)
     await state.set_state(EditTimezoneForm.offset)
     await callback.message.edit_text(
@@ -164,6 +165,7 @@ async def settings_currency_callback(callback: types.CallbackQuery):
 async def set_currency_callback(callback: types.CallbackQuery, state: FSMContext):
     if not _is_admin(callback.from_user.id):
         return
+    await callback.answer()
     payload = callback.data.replace("set_currency_", "", 1)
     if payload == "custom":
         await state.set_state(EditCurrencyForm.symbol)
@@ -414,6 +416,7 @@ async def process_booking_window(message: types.Message, state: FSMContext):
 async def settings_working_hours_cb(callback: types.CallbackQuery, state: FSMContext):
     if not _is_admin(callback.from_user.id):
         return
+    await callback.answer()
     current_wh = salon_config.get("working_hours", "10:00-20:00")
     await state.set_state(WorkingHoursForm.hours)
     await callback.message.edit_text(
@@ -442,6 +445,7 @@ async def process_working_hours(message: types.Message, state: FSMContext):
 async def settings_interval_cb(callback: types.CallbackQuery, state: FSMContext):
     if not _is_admin(callback.from_user.id):
         return
+    await callback.answer()
     current_interval = salon_config.get("schedule_interval", 30)
     await state.set_state(ScheduleIntervalForm.interval)
     await callback.message.edit_text(
