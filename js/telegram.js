@@ -12,6 +12,9 @@ export function initTelegram() {
     });
 
     tg.expand();
+    if (typeof tg.disableVerticalSwipes === 'function') {
+        tg.disableVerticalSwipes();
+    }
     tg.ready();
     tg.setHeaderColor(config.themeColors.headerColor);
     tg.setBackgroundColor(config.themeColors.backgroundColor);

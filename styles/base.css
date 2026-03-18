@@ -156,17 +156,30 @@ body {
     padding-bottom: 24px;
 }
 
+.salon-header--text-only::before {
+    content: "";
+    width: 64px;
+    height: 3px;
+    margin-bottom: 16px;
+    border-radius: 999px;
+    background: linear-gradient(90deg, rgba(212, 175, 55, 0.18), rgba(212, 175, 55, 0.95), rgba(212, 175, 55, 0.18));
+    box-shadow: 0 0 18px rgba(212, 175, 55, 0.22);
+}
+
 .salon-header--text-only .salon-logo-placeholder {
     display: none;
 }
 
 .salon-header--text-only .salon-name {
     font-size: 26px;
+    font-weight: 800;
     letter-spacing: -0.03em;
 }
 
 .salon-header--text-only .salon-tagline {
     margin-top: 10px;
+    letter-spacing: 0.18em;
+    color: rgba(245, 245, 245, 0.62);
 }
 
 /* --- Main Content Area --- */
