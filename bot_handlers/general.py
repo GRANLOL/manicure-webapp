@@ -208,12 +208,10 @@ async def _show_booking_list(message_or_callback, *, context: str, page: int = 0
 
 
 async def send_client_home(message: types.Message, *, text: str, is_admin: bool) -> None:
-    await message.answer(text, parse_mode="HTML", reply_markup=keyboards.get_booking_launch_keyboard())
     await message.answer(
-        "👤 <b>Клиентское меню</b>\n\n"
-        "Здесь доступны ваши записи, история и быстрый переход к онлайн-записи.",
+        text,
         parse_mode="HTML",
-        reply_markup=keyboards.get_main_menu(is_admin=is_admin),
+        reply_markup=keyboards.get_booking_launch_keyboard(),
     )
 
 
