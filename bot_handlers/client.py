@@ -286,7 +286,7 @@ async def handle_portfolio(message: types.Message):
     )
 
 
-@router.message(F.text == "📅 Записаться")
+@router.message(F.text.in_({"📅 Записаться", "📲 Записаться"}))
 async def launch_booking_webapp(message: types.Message):
     await message.answer(
         "📅 <b>Онлайн-запись</b>\n\nВыберите удобное время и оформите запись онлайн.",
