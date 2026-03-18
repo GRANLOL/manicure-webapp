@@ -234,7 +234,10 @@ async def start_handler(message: types.Message):
         )
         return
 
-    welcome_text = salon_config.get("welcome_text", "Привет! Выберите нужное действие:")
+    welcome_text = salon_config.get(
+        "welcome_text",
+        "📅 <b>Онлайн-запись</b>\n\nВыберите удобное время и оформите запись онлайн.",
+    )
     await send_client_home(message, text=welcome_text, is_admin=is_admin)
 
 
