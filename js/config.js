@@ -46,8 +46,8 @@ export const config = {
     // Название заведения, которое отображается в шапке
     salonName: "Nail Studio Deluxe",
     salonLogoUrl: "",
-    salonLogoText: "",
-    salonTagline: "",
+    salonLogoText: "NS",
+    salonTagline: "premium nail care",
 
     apiBaseUrl: resolveApiBaseUrl(),
 
