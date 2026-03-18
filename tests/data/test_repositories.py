@@ -3,7 +3,13 @@ from datetime import date
 from unittest.mock import patch
 
 from repositories.analytics import get_bookings_by_weekday, get_revenue_stats
-from repositories.bookings import create_booking_if_available, get_all_bookings
+from repositories.bookings import (
+    ActiveBookingLimitReachedError,
+    create_booking_if_available,
+    get_all_bookings,
+    reschedule_booking_if_available,
+    search_bookings,
+)
 from repositories.categories import (
     add_category,
     delete_category,
@@ -118,6 +124,61 @@ class BookingRepositoryTests(RepositoryTestCase):
 
         self.assertEqual(weekday_stats["Пн"], 0)
         self.assertEqual(weekday_stats["Вс"], 1)
+
+    async def test_reschedule_booking_moves_slot_when_new_time_is_free(self):
+        await create_booking_if_available(
+            user_id=1,
+            name="Alice",
+            phone="+10000000001",
+            date="15.03.2026",
+            time="10:00",
+            duration=60,
+        )
+
+        moved = await reschedule_booking_if_available(1, "15.03.2026", "12:00")
+        bookings = await search_bookings("Alice")
+
+        self.assertTrue(moved)
+        self.assertEqual(bookings[0][4], "12:00")
+
+    async def test_search_bookings_matches_phone_and_name(self):
+        await create_booking_if_available(
+            user_id=1,
+            name="Alice Example",
+            phone="+70000000001",
+            date="15.03.2026",
+            time="10:00",
+            duration=60,
+        )
+
+        by_name = await search_bookings("Alice")
+        by_phone = await search_bookings("0001")
+
+        self.assertEqual(len(by_name), 1)
+        self.assertEqual(len(by_phone), 1)
+
+    async def test_create_booking_rejects_when_user_reaches_active_limit(self):
+        with patch.dict("repositories.bookings.salon_config", {"max_active_bookings_per_user": 3}, clear=False):
+            for index, time_value in enumerate(("10:00", "11:00", "12:00"), start=1):
+                created = await create_booking_if_available(
+                    user_id=77,
+                    name=f"Client {index}",
+                    phone=f"+7000000000{index}",
+                    date="15.03.2026",
+                    time=time_value,
+                    duration=60,
+                )
+                self.assertTrue(created)
+
+            with self.assertRaises(ActiveBookingLimitReachedError):
+                await create_booking_if_available(
+                    user_id=77,
+                    name="Client 4",
+                    phone="+70000000004",
+                    date="16.03.2026",
+                    time="10:00",
+                    duration=60,
+                )
 
 
 class CategoryRepositoryTests(RepositoryTestCase):

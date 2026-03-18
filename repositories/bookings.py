@@ -1,7 +1,12 @@
 from __future__ import annotations
 
 from .base import _slot_overlaps, _time_to_minutes, _to_iso_date, aiosqlite, db_connect, datetime
+from config import salon_config
 from time_utils import build_reminder_schedule, combine_salon_datetime, get_salon_now, get_salon_today
+
+
+class ActiveBookingLimitReachedError(Exception):
+    pass
 
 
 def _duration_from_range(start_time: str, end_time: str) -> int:
@@ -90,6 +95,16 @@ async def create_booking_if_available(
 
     async with db_connect(timeout=30) as db:
         await db.execute("BEGIN IMMEDIATE")
+
+        active_limit = max(int(salon_config.get("max_active_bookings_per_user", 3) or 3), 1)
+        async with db.execute(
+            "SELECT COUNT(id) FROM bookings WHERE user_id = ? AND status = 'scheduled'",
+            (user_id,),
+        ) as cursor:
+            active_count = (await cursor.fetchone())[0]
+        if active_count >= active_limit:
+            await db.rollback()
+            raise ActiveBookingLimitReachedError(active_limit)
 
         async with db.execute(
             "SELECT time, duration FROM bookings WHERE date = ? AND status = 'scheduled'",

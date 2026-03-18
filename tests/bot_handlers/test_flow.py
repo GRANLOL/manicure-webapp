@@ -327,6 +327,30 @@ class BookingServiceTests(unittest.IsolatedAsyncioTestCase):
         remove_message.delete.assert_awaited_once()
         self.assertEqual(message.bot.send_message.await_count, 2)
 
+    async def test_finalize_web_booking_replies_when_active_booking_limit_is_reached(self):
+        message = make_message(user_id=5, full_name="Alice")
+
+        with patch.object(
+            booking_service.database,
+            "create_booking_if_available",
+            AsyncMock(side_effect=booking_service.database.ActiveBookingLimitReachedError(3)),
+        ), patch.dict(booking_service.salon_config, {"max_active_bookings_per_user": 3}, clear=False):
+            await booking_service.finalize_web_booking(
+                message,
+                service="РњР°РЅРёРєСЋСЂ",
+                date="14.03.2026",
+                time="10:00",
+                duration=60,
+                phone="+100",
+                name="Alice",
+                price=2500,
+                is_admin=False,
+            )
+
+        message.answer.assert_awaited_once_with(ANY)
+        self.assertIn("3", message.answer.await_args.args[0])
+        message.bot.send_message.assert_not_awaited()
+
 
 class CancelBookingHandlerTests(unittest.IsolatedAsyncioTestCase):
     async def test_cancel_booking_callback_rejects_foreign_user(self):

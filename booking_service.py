@@ -4,6 +4,7 @@ from os import getenv
 
 from aiogram import types
 
+from config import salon_config
 import database
 import keyboards
 
@@ -34,16 +35,23 @@ async def create_booking_and_notify(
 ) -> tuple[bool, str]:
     full_name_service = f"{name} ({service})" if name else f"{user_full_name} ({service})"
 
-    booking_created = await database.create_booking_if_available(
-        user_id=user_id,
-        name=full_name_service,
-        phone=phone,
-        date=date,
-        time=time,
-        duration=duration,
-        service_name=service,
-        price=price,
-    )
+    try:
+        booking_created = await database.create_booking_if_available(
+            user_id=user_id,
+            name=full_name_service,
+            phone=phone,
+            date=date,
+            time=time,
+            duration=duration,
+            service_name=service,
+            price=price,
+        )
+    except database.ActiveBookingLimitReachedError:
+        active_limit = max(int(salon_config.get("max_active_bookings_per_user", 3) or 3), 1)
+        return False, (
+            f"У вас уже {active_limit} активные записи.\n\n"
+            "Отмените одну из текущих записей, чтобы оформить новую."
+        )
     if not booking_created:
         return False, "Этот слот уже занят.\n\nОбновите форму записи и выберите другое время."
 

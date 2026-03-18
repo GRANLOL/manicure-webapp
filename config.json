@@ -45,6 +45,7 @@
     "19:00"
   ],
   "booking_window": 14,
+  "max_active_bookings_per_user": 3,
   "show_service_duration": true,
   "webapp_auth_required": true,
   "working_days": [
