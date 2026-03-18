@@ -8,6 +8,24 @@ const selectTrigger = document.getElementById('select-trigger');
 const selectLabel = document.getElementById('select-label');
 const customOptionsContainer = document.getElementById('custom-options');
 
+function formatServiceDuration(durationValue) {
+    const minutes = Number(durationValue);
+    if (!Number.isFinite(minutes) || minutes <= 0) {
+        return '';
+    }
+
+    const hours = Math.floor(minutes / 60);
+    const remainder = minutes % 60;
+
+    if (hours === 0) {
+        return `${minutes} мин`;
+    }
+    if (remainder === 0) {
+        return `${hours} ч`;
+    }
+    return `${hours} ч ${remainder} мин`;
+}
+
 function formatServicePrice(priceValue) {
     const raw = String(priceValue ?? '').trim();
     if (!raw) {
@@ -17,6 +35,27 @@ function formatServicePrice(priceValue) {
         return raw;
     }
     return `${raw} ${store.currencySymbol}`;
+}
+
+function renderTriggerLabel(serviceObj) {
+    const title = document.createElement('span');
+    title.className = 'trigger-title';
+    title.textContent = serviceObj?.name || 'Выберите услугу...';
+
+    selectLabel.replaceChildren(title);
+
+    const durationText = formatServiceDuration(serviceObj?.duration);
+    const priceText = formatServicePrice(serviceObj?.price);
+    const metaParts = [durationText, priceText].filter(Boolean);
+
+    if (metaParts.length === 0) {
+        return;
+    }
+
+    const meta = document.createElement('span');
+    meta.className = 'trigger-meta';
+    meta.textContent = metaParts.join(' • ');
+    selectLabel.appendChild(meta);
 }
 
 function getUnavailableServiceMessage(reason) {
@@ -102,13 +141,34 @@ export function createServiceOption(serviceObj) {
     dot.className = 'service-dot';
     dot.textContent = '●';
 
+    const info = document.createElement('div');
+    info.className = 'service-info';
+
     const name = document.createElement('span');
     name.className = 'service-name';
     name.textContent = serviceObj.name;
 
+    const meta = document.createElement('div');
+    meta.className = 'service-meta';
+
+    const duration = document.createElement('span');
+    duration.className = 'service-duration';
+    duration.textContent = formatServiceDuration(serviceObj.duration);
+
     const price = document.createElement('span');
     price.className = 'service-price';
     price.textContent = formatServicePrice(serviceObj.price);
+
+    info.appendChild(name);
+    if (duration.textContent) {
+        meta.appendChild(duration);
+    }
+    if (price.textContent) {
+        meta.appendChild(price);
+    }
+    if (meta.childElementCount > 0) {
+        info.appendChild(meta);
+    }
 
     const availability = getServiceAvailability(serviceObj);
     if (!availability.selectable) {
@@ -120,7 +180,7 @@ export function createServiceOption(serviceObj) {
         optionDiv.classList.add('selected');
     }
 
-    optionDiv.append(dot, name, price);
+    optionDiv.append(dot, info);
     optionDiv.addEventListener('click', () => {
         if (!availability.selectable) {
             if (tg.HapticFeedback) {
@@ -135,7 +195,7 @@ export function createServiceOption(serviceObj) {
         }
 
         tg.HapticFeedback.impactOccurred('light');
-        selectLabel.textContent = serviceObj.name;
+        renderTriggerLabel(serviceObj);
         selectTrigger.classList.add('selected');
 
         document.querySelectorAll('.custom-option').forEach(opt => opt.classList.remove('selected'));
@@ -156,11 +216,17 @@ export function populateServices(searchQuery = '') {
     const resultsContainer = document.getElementById('service-results');
     resultsContainer.innerHTML = '';
 
+    const selectedServiceObj = store.dynamicServices.find(service => service.name === store.selectedService);
+    renderTriggerLabel(selectedServiceObj ?? null);
+
     if (searchQuery.trim().length > 0) {
         const query = searchQuery.toLowerCase();
-        const filtered = store.dynamicServices.filter(service =>
-            service.name.toLowerCase().includes(query) || service.price.toLowerCase().includes(query),
-        );
+        const filtered = store.dynamicServices.filter((service) => {
+            const nameText = String(service.name ?? '').toLowerCase();
+            const priceText = formatServicePrice(service.price).toLowerCase();
+            const durationText = formatServiceDuration(service.duration).toLowerCase();
+            return nameText.includes(query) || priceText.includes(query) || durationText.includes(query);
+        });
         if (filtered.length === 0) {
             const notFoundDiv = document.createElement('div');
             notFoundDiv.className = 'custom-option';
