@@ -158,6 +158,17 @@ body.dropdown-open::before {
     background-color: rgba(255, 255, 255, 0.08);
 }
 
+.cat-header.is-disabled,
+.subcat-header.is-disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.cat-header.is-disabled:active,
+.subcat-header.is-disabled:active {
+    background-color: transparent;
+}
+
 .cat-name {
     font-weight: 600;
     font-size: 15px;
@@ -310,6 +321,22 @@ body.dropdown-open::before {
     font-weight: 600;
     padding-left: 24px;
     border-left: 4px solid var(--accent-hover);
+}
+
+.custom-option.is-disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.custom-option.is-disabled:hover,
+.custom-option.is-disabled:active {
+    background-color: transparent;
+}
+
+.custom-option.is-disabled .service-dot,
+.custom-option.is-disabled .service-name,
+.custom-option.is-disabled .service-price {
+    color: var(--text-muted);
 }
 
 .service-name {

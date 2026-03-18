@@ -1,6 +1,8 @@
 import { tg } from '../telegram.js';
 import { store } from '../store.js';
 import { checkConfirmation } from './form.js';
+import { generateDates, generateTimes, getSlotAvailability, hasAvailableSlots } from './datetime.js';
+import { showToast } from './toast.js';
 
 const selectTrigger = document.getElementById('select-trigger');
 const selectLabel = document.getElementById('select-label');
@@ -15,6 +17,81 @@ function formatServicePrice(priceValue) {
         return raw;
     }
     return `${raw} ${store.currencySymbol}`;
+}
+
+function getUnavailableServiceMessage(reason) {
+    if (reason === 'outside_working_hours') {
+        return 'Эта услуга не помещается в выбранное время. Выберите более ранний слот или другую услугу.';
+    }
+    if (reason === 'busy_overlap') {
+        return 'Для этой услуги выбранное время уже не подходит. Выберите другой слот или более короткую услугу.';
+    }
+    if (reason === 'past') {
+        return 'Выбранное время уже прошло. Обновите слот и попробуйте снова.';
+    }
+    return 'Эта услуга сейчас недоступна для выбранных даты и времени.';
+}
+
+function getServiceAvailability(serviceObj) {
+    if (!store.selectedDate || !store.selectedTime) {
+        return { selectable: true, reason: null };
+    }
+
+    const availability = getSlotAvailability(
+        store.selectedDate,
+        store.selectedTime,
+        serviceObj.duration || 60,
+    );
+
+    return {
+        selectable: availability.available,
+        reason: availability.reason,
+    };
+}
+
+function categoryHasSelectableContent(categoryId) {
+    const subCats = store.dynamicCategories.filter(item => item.parent_id === categoryId);
+    const dirServices = store.dynamicServices.filter(service => service.category_id === categoryId);
+
+    if (dirServices.some(service => getServiceAvailability(service).selectable)) {
+        return true;
+    }
+
+    return subCats.some(sub => categoryHasSelectableContent(sub.id));
+}
+
+function syncDateTimeSelectionAfterServiceChange() {
+    generateDates();
+
+    if (!store.selectedDate) {
+        generateTimes();
+        return;
+    }
+
+    if (!hasAvailableSlots(store.selectedDate)) {
+        store.selectedDate = null;
+        store.selectedTime = null;
+        generateDates();
+        generateTimes();
+        showToast({
+            title: 'Дата обновлена',
+            message: 'Для этой услуги на выбранную дату больше нет свободных окон. Выберите другую дату.',
+            variant: 'neutral',
+        });
+        return;
+    }
+
+    if (store.selectedTime && !getSlotAvailability(store.selectedDate, store.selectedTime).available) {
+        store.selectedTime = null;
+        showToast({
+            title: 'Время обновлено',
+            message: 'Для этой услуги нужен другой слот. Выберите подходящее время.',
+            variant: 'neutral',
+        });
+    }
+
+    generateDates();
+    generateTimes(store.selectedDate);
 }
 
 export function createServiceOption(serviceObj) {
@@ -33,8 +110,30 @@ export function createServiceOption(serviceObj) {
     price.className = 'service-price';
     price.textContent = formatServicePrice(serviceObj.price);
 
+    const availability = getServiceAvailability(serviceObj);
+    if (!availability.selectable) {
+        optionDiv.classList.add('is-disabled');
+        optionDiv.setAttribute('aria-disabled', 'true');
+        optionDiv.title = getUnavailableServiceMessage(availability.reason);
+    }
+    if (store.selectedService === serviceObj.name) {
+        optionDiv.classList.add('selected');
+    }
+
     optionDiv.append(dot, name, price);
     optionDiv.addEventListener('click', () => {
+        if (!availability.selectable) {
+            if (tg.HapticFeedback) {
+                tg.HapticFeedback.notificationOccurred('warning');
+            }
+            showToast({
+                title: 'Услуга недоступна',
+                message: getUnavailableServiceMessage(availability.reason),
+                variant: 'neutral',
+            });
+            return;
+        }
+
         tg.HapticFeedback.impactOccurred('light');
         selectLabel.textContent = serviceObj.name;
         selectTrigger.classList.add('selected');
@@ -46,6 +145,8 @@ export function createServiceOption(serviceObj) {
         store.selectedService = serviceObj.name;
         store.selectedDuration = serviceObj.duration || 60;
         store.selectedPrice = parseInt((serviceObj.price || '0').replace(/\D/g, '')) || 0;
+        syncDateTimeSelectionAfterServiceChange();
+        populateServices();
         checkConfirmation();
     }, { passive: true });
     return optionDiv;
@@ -87,6 +188,7 @@ export function populateServices(searchQuery = '') {
 
         const header = document.createElement('div');
         header.className = isRoot ? 'cat-header' : 'subcat-header';
+        const hasSelectableContent = categoryHasSelectableContent(category.id);
 
         const title = document.createElement('span');
         title.className = isRoot ? 'cat-name' : 'subcat-name';
@@ -118,6 +220,14 @@ export function populateServices(searchQuery = '') {
             if (!isRoot) {
                 e.stopPropagation();
             }
+            if (!hasSelectableContent) {
+                showToast({
+                    title: 'Нет доступных услуг',
+                    message: 'Для выбранных даты и времени услуги из этого раздела сейчас недоступны.',
+                    variant: 'neutral',
+                });
+                return;
+            }
             if (window.tg && tg.HapticFeedback) {
                 tg.HapticFeedback.impactOccurred('light');
             }
@@ -146,6 +256,11 @@ export function populateServices(searchQuery = '') {
                 }, { once: true });
             }
         });
+
+        if (!hasSelectableContent) {
+            group.classList.add('is-disabled');
+            header.classList.add('is-disabled');
+        }
 
         group.appendChild(header);
         group.appendChild(body);
@@ -180,6 +295,10 @@ export function initServiceListeners() {
             populateServices(e.target.value);
         });
     }
+
+    document.addEventListener('booking-selection-changed', () => {
+        populateServices(searchInput ? searchInput.value : '');
+    });
 
     selectTrigger.addEventListener('click', toggleDropdown);
 
