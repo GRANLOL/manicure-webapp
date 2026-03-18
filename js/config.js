@@ -45,7 +45,7 @@ function resolveApiBaseUrl() {
 export const config = {
     // Название заведения, которое отображается в шапке
     salonName: "Nail Studio Deluxe",
-    salonLogoUrl: "",
+    salonLogoUrl: "https://granlol.github.io/manicure-webapp/assets/logos/testlogo.png",
     salonLogoText: "",
     salonTagline: "online booking",
 
