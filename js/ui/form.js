@@ -80,6 +80,23 @@ export function initFormListeners() {
     const nameInput = document.getElementById('name-input');
     const phoneInput = document.getElementById('phone-input');
 
+    const handleEnterKey = (event) => {
+        if (event.key !== 'Enter') {
+            return;
+        }
+
+        event.preventDefault();
+
+        if (event.currentTarget === nameInput) {
+            phoneInput.focus({ preventScroll: true });
+            return;
+        }
+
+        if (document.activeElement instanceof HTMLElement) {
+            document.activeElement.blur();
+        }
+    };
+
     if (bookingButton) {
         bookingButton.addEventListener('click', () => {
             const issues = getFormIssues();
@@ -102,6 +119,7 @@ export function initFormListeners() {
     nameInput.addEventListener('input', () => {
         checkConfirmation();
     });
+    nameInput.addEventListener('keydown', handleEnterKey);
 
     phoneInput.addEventListener('input', (e) => {
         notifyHaptic('impact', 'light');
@@ -136,6 +154,7 @@ export function initFormListeners() {
         e.target.value = formatted;
         checkConfirmation();
     });
+    phoneInput.addEventListener('keydown', handleEnterKey);
 
     checkConfirmation();
 }
