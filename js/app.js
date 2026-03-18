@@ -8,8 +8,62 @@ import { initModal } from './ui/modal.js';
 import { initPrivacyModal } from './ui/privacy.js';
 import './ui/toast.js';
 
+function ensureTaglineElement(header) {
+    let taglineEl = header.querySelector('.salon-tagline');
+    if (!taglineEl) {
+        taglineEl = document.createElement('div');
+        taglineEl.className = 'salon-tagline';
+        taglineEl.hidden = true;
+        header.appendChild(taglineEl);
+    }
+    return taglineEl;
+}
+
+function applyHeaderBranding() {
+    const header = document.querySelector('.salon-header');
+    const nameEl = document.getElementById('salon-name-display');
+    const brandMark = header.querySelector('.salon-logo-placeholder');
+    const taglineEl = ensureTaglineElement(header);
+
+    nameEl.textContent = config.salonName;
+
+    const logoUrl = String(config.salonLogoUrl || '').trim();
+    const logoText = String(config.salonLogoText || '').trim();
+    const tagline = String(config.salonTagline || '').trim();
+
+    header.classList.remove('salon-header--text-only', 'salon-header--with-image');
+    brandMark.classList.remove('salon-logo-placeholder--image');
+    brandMark.removeAttribute('style');
+    brandMark.hidden = false;
+    brandMark.textContent = '';
+
+    if (logoUrl) {
+        header.classList.add('salon-header--with-image');
+        brandMark.classList.add('salon-logo-placeholder--image');
+        brandMark.style.backgroundImage = `url("${logoUrl}")`;
+        brandMark.style.backgroundSize = 'cover';
+        brandMark.style.backgroundPosition = 'center';
+        brandMark.style.backgroundRepeat = 'no-repeat';
+    } else {
+        if (logoText) {
+            brandMark.textContent = logoText;
+        } else {
+            header.classList.add('salon-header--text-only');
+            brandMark.hidden = true;
+        }
+    }
+
+    if (tagline) {
+        taglineEl.textContent = tagline;
+        taglineEl.hidden = false;
+    } else {
+        taglineEl.hidden = true;
+        taglineEl.textContent = '';
+    }
+}
+
 // --- A. Configuration Injection ---
-document.getElementById('salon-name-display').textContent = config.salonName;
+applyHeaderBranding();
 
 // --- G. Initialization ---
 document.addEventListener('DOMContentLoaded', async () => {

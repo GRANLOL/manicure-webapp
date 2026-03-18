@@ -115,6 +115,9 @@ body {
     /* Pseudo-element for inner glow */
     border: 3px solid rgba(212, 175, 55, 0.4);
     background-clip: padding-box;
+    text-transform: uppercase;
+    font-weight: 800;
+    letter-spacing: 0.06em;
 }
 
 .salon-logo-placeholder::before {
@@ -127,12 +130,39 @@ body {
     pointer-events: none;
 }
 
+.salon-logo-placeholder--image {
+    color: transparent;
+}
+
 .salon-name {
     font-size: 22px;
     font-weight: 700;
     color: var(--text-color);
     letter-spacing: -0.5px;
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+}
+
+.salon-tagline {
+    margin-top: 8px;
+    color: var(--text-muted);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+}
+
+.salon-header--text-only {
+    padding-top: 34px;
+    padding-bottom: 24px;
+}
+
+.salon-header--text-only .salon-name {
+    font-size: 26px;
+    letter-spacing: -0.03em;
+}
+
+.salon-header--text-only .salon-tagline {
+    margin-top: 10px;
 }
 
 /* --- Main Content Area --- */
