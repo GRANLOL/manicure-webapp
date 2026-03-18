@@ -32,6 +32,7 @@ export function showModal() {
         modalName.textContent = nameInput.value.trim();
         modalPhone.textContent = phoneInput.value;
 
+        document.body.classList.add('modal-open');
         modal.classList.add('active');
     }, 0);
 }
@@ -40,6 +41,7 @@ export function hideModal() {
     if (tg.HapticFeedback) {
         tg.HapticFeedback.impactOccurred('light');
     }
+    document.body.classList.remove('modal-open');
     modal.classList.remove('active');
     checkConfirmation();
 }
