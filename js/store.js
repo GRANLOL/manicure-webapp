@@ -1,4 +1,4 @@
-import { config } from './config.js?v=5';
+import { config } from './config.js';
 
 // Central State Management
 export const store = {
