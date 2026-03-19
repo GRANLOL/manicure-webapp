@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import timedelta
+
 from .base import _slot_overlaps, _time_to_minutes, _to_iso_date, aiosqlite, db_connect, datetime
 from config import salon_config
 from time_utils import build_reminder_schedule, combine_salon_datetime, get_salon_now, get_salon_today
@@ -34,6 +36,74 @@ def _booking_datetime(date: str, time: str):
     booking_date = datetime.strptime(date, "%d.%m.%Y").date()
     booking_time = datetime.strptime(time, "%H:%M").time()
     return combine_salon_datetime(booking_date, booking_time)
+
+
+def _build_busy_slot(
+    time_value: str,
+    duration: int,
+    *,
+    kind: str = "booking",
+    label: str | None = None,
+) -> dict:
+    slot = {
+        "time": time_value,
+        "duration": int(duration or 60),
+        "kind": kind,
+    }
+    if label:
+        slot["label"] = label
+    return slot
+
+
+def _is_date_open_for_break(date_str: str) -> bool:
+    try:
+        target_date = datetime.strptime(date_str, "%d.%m.%Y").date()
+    except ValueError:
+        return False
+
+    js_weekday = (target_date.weekday() + 1) % 7
+    working_days = salon_config.get("working_days", [1, 2, 3, 4, 5, 6, 0])
+    blacklisted_dates = salon_config.get("blacklisted_dates", [])
+    return js_weekday in working_days and date_str not in blacklisted_dates
+
+
+def _get_lunch_break_slot(date_str: str) -> dict | None:
+    if not bool(salon_config.get("lunch_break_enabled", False)):
+        return None
+    if not _is_date_open_for_break(date_str):
+        return None
+
+    start_time = str(salon_config.get("lunch_break_start", "") or "").strip()
+    end_time = str(salon_config.get("lunch_break_end", "") or "").strip()
+    duration = _duration_from_range(start_time, end_time)
+    if duration <= 0:
+        return None
+    return _build_busy_slot(start_time, duration, kind="lunch", label="Обед")
+
+
+def _collect_busy_slots(date_str: str, booking_rows, blocked_rows) -> list[dict]:
+    busy_slots = [
+        _build_busy_slot(time_value, duration if duration is not None else 60)
+        for time_value, duration in booking_rows
+    ]
+    for start_time, end_time, reason in blocked_rows:
+        duration = _duration_from_range(start_time, end_time)
+        if duration > 0:
+            busy_slots.append(
+                _build_busy_slot(
+                    start_time,
+                    duration,
+                    kind="break",
+                    label=(reason or "Перерыв"),
+                )
+            )
+
+    lunch_slot = _get_lunch_break_slot(date_str)
+    if lunch_slot is not None:
+        busy_slots.append(lunch_slot)
+
+    busy_slots.sort(key=lambda item: item["time"])
+    return busy_slots
 
 
 async def sync_completed_bookings() -> int:
@@ -124,13 +194,19 @@ async def create_booking_if_available(
             (date,),
         ) as cursor:
             rows = await cursor.fetchall()
+        async with db.execute(
+            "SELECT start_time, end_time, reason FROM blocked_slots WHERE date = ?",
+            (date,),
+        ) as cursor:
+            blocked_rows = await cursor.fetchall()
 
-        for busy_time, busy_duration in rows:
+        for busy in _collect_busy_slots(date, rows, blocked_rows):
+            busy_time = busy["time"]
+            busy_duration = int(busy.get("duration") or 60)
             busy_start = _time_to_minutes(busy_time)
             if busy_start is None:
                 continue
-            normalized_busy_duration = int(busy_duration or 60)
-            if _slot_overlaps(slot_start, int(duration or 60), busy_start, normalized_busy_duration):
+            if _slot_overlaps(slot_start, int(duration or 60), busy_start, busy_duration):
                 await db.rollback()
                 return False
 
@@ -170,20 +246,12 @@ async def get_busy_slots_by_date(date: str):
         ) as cursor:
             rows = await cursor.fetchall()
         async with db.execute(
-            "SELECT start_time, end_time FROM blocked_slots WHERE date = ? ORDER BY start_time",
+            "SELECT start_time, end_time, reason FROM blocked_slots WHERE date = ? ORDER BY start_time",
             (date,),
         ) as cursor:
             blocked_rows = await cursor.fetchall()
 
-    busy_slots = [
-        {"time": time_value, "duration": duration if duration is not None else 60}
-        for time_value, duration in rows
-    ]
-    for start_time, end_time in blocked_rows:
-        duration = _duration_from_range(start_time, end_time)
-        if duration > 0:
-            busy_slots.append({"time": start_time, "duration": duration})
-    return busy_slots
+    return _collect_busy_slots(date, rows, blocked_rows)
 
 
 async def get_all_bookings():
@@ -670,16 +738,31 @@ async def get_all_busy_slots():
             "SELECT date, time, duration FROM bookings WHERE status = 'scheduled'"
         ) as cursor:
             rows = await cursor.fetchall()
-        async with db.execute("SELECT date, start_time, end_time FROM blocked_slots") as cursor:
+        async with db.execute("SELECT date, start_time, end_time, reason FROM blocked_slots") as cursor:
             blocked_rows = await cursor.fetchall()
 
     busy_slots = defaultdict(list)
-    if rows:
-        for date, time_str, duration in rows:
-            busy_slots[date].append({"time": time_str, "duration": duration or 60})
-    if blocked_rows:
-        for date, start_time, end_time in blocked_rows:
-            duration = _duration_from_range(start_time, end_time)
-            if duration > 0:
-                busy_slots[date].append({"time": start_time, "duration": duration})
+    bookings_by_date = defaultdict(list)
+    breaks_by_date = defaultdict(list)
+
+    for date, time_str, duration in rows:
+        bookings_by_date[date].append((time_str, duration))
+    for date, start_time, end_time, reason in blocked_rows:
+        breaks_by_date[date].append((start_time, end_time, reason))
+
+    all_dates = set(bookings_by_date.keys()) | set(breaks_by_date.keys())
+    booking_window = max(int(salon_config.get("booking_window", 7) or 7), 1)
+    today = get_salon_today()
+    for offset in range(booking_window):
+        all_dates.add((today + timedelta(days=offset)).strftime("%d.%m.%Y"))
+
+    for date_str in sorted(all_dates, key=lambda value: _to_iso_date(value) or value):
+        collected = _collect_busy_slots(
+            date_str,
+            bookings_by_date.get(date_str, []),
+            breaks_by_date.get(date_str, []),
+        )
+        if collected:
+            busy_slots[date_str].extend(collected)
+
     return dict(busy_slots)

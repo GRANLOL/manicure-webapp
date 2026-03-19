@@ -3,12 +3,15 @@ from __future__ import annotations
 import re
 
 from money import get_currency_symbol
+from time_utils import get_salon_today
 
-from .base import F, FSMContext, Router, database, datetime, getenv, keyboards, salon_config, update_config, types
+from .base import F, FSMContext, Router, database, datetime, getenv, keyboards, salon_config, timedelta, update_config, types
 from .states import (
     AddBlacklistDateForm,
     AddBlockedSlotForm,
     AddBookingWindowForm,
+    ConfigureLunchBreakForm,
+    ConfigureSingleBreakForm,
     EditCurrencyForm,
     EditReminderSettingsForm,
     EditTimezoneForm,
@@ -29,6 +32,94 @@ def _schedule_markup():
         salon_config.get("working_days", [1, 2, 3, 4, 5, 6, 0]),
         salon_config.get("blacklisted_dates", []),
     )
+
+
+def _parse_working_hours_bounds() -> tuple[int, int]:
+    match = re.search(r"(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})", salon_config.get("working_hours", "10:00-20:00") or "")
+    start_str, end_str = ("10:00", "20:00")
+    if match:
+        start_str, end_str = match.group(1), match.group(2)
+    elif "-" in str(salon_config.get("working_hours", "")):
+        start_str, end_str = [part.strip() for part in salon_config.get("working_hours", "10:00-20:00").split("-", 1)]
+
+    start_hours, start_minutes = map(int, start_str.split(":"))
+    end_hours, end_minutes = map(int, end_str.split(":"))
+    return start_hours * 60 + start_minutes, end_hours * 60 + end_minutes
+
+
+def _build_break_boundaries() -> list[str]:
+    start_mins, end_mins = _parse_working_hours_bounds()
+    interval = int(salon_config.get("schedule_interval", 30) or 30)
+    if interval <= 0:
+        interval = 30
+
+    values = []
+    current = start_mins
+    while current <= end_mins:
+        values.append(f"{current // 60:02d}:{current % 60:02d}")
+        current += interval
+    return values
+
+
+def _build_break_start_options(prefix: str) -> list[tuple[str, str]]:
+    boundaries = _build_break_boundaries()
+    return [(f"{prefix}_{value}", value) for value in boundaries[:-1]]
+
+
+def _build_break_end_options(prefix: str, start_time: str) -> list[tuple[str, str]]:
+    boundaries = _build_break_boundaries()
+    return [(f"{prefix}_{value}", value) for value in boundaries if value > start_time]
+
+
+def _breaks_menu_markup(blocked_slots):
+    lunch_enabled = bool(salon_config.get("lunch_break_enabled", False))
+    lunch_start = str(salon_config.get("lunch_break_start", "") or "").strip()
+    lunch_end = str(salon_config.get("lunch_break_end", "") or "").strip()
+    lunch_summary = f"{lunch_start}-{lunch_end}" if lunch_enabled and lunch_start and lunch_end else "не настроен"
+    return keyboards.get_breaks_menu_keyboard(blocked_slots, lunch_summary, lunch_enabled)
+
+
+def _build_single_break_date_options() -> list[tuple[str, str]]:
+    booking_window = max(int(salon_config.get("booking_window", 7) or 7), 1)
+    working_days = salon_config.get("working_days", [1, 2, 3, 4, 5, 6, 0])
+    blacklisted_dates = set(salon_config.get("blacklisted_dates", []))
+    today = get_salon_today()
+    options = []
+
+    weekday_names = {1: "Пн", 2: "Вт", 3: "Ср", 4: "Чт", 5: "Пт", 6: "Сб", 0: "Вс"}
+    for offset in range(booking_window):
+        current_date = today + timedelta(days=offset)
+        js_weekday = (current_date.weekday() + 1) % 7
+        date_str = current_date.strftime("%d.%m.%Y")
+        if js_weekday not in working_days or date_str in blacklisted_dates:
+            continue
+        label = f"{current_date.strftime('%d.%m')} ({weekday_names[js_weekday]})"
+        options.append((f"single_break_date_{date_str}", label))
+    return options
+
+
+def _breaks_menu_text(blocked_slots) -> str:
+    lunch_enabled = bool(salon_config.get("lunch_break_enabled", False))
+    lunch_start = str(salon_config.get("lunch_break_start", "") or "").strip()
+    lunch_end = str(salon_config.get("lunch_break_end", "") or "").strip()
+    lunch_line = f"{lunch_start}-{lunch_end}" if lunch_enabled and lunch_start and lunch_end else "не настроен"
+
+    lines = [
+        "🍽 <b>Перерыв</b>",
+        "",
+        f"Постоянный обед: <b>{lunch_line}</b>",
+        "Обед действует на все рабочие даты, включая будущие даты после текущего окна записи.",
+        "",
+    ]
+
+    if blocked_slots:
+        lines.append("Разовые перерывы:")
+        for _slot_id, date_str, start_time, end_time, _reason in blocked_slots[:12]:
+            lines.append(f"• {date_str} {start_time}-{end_time}")
+    else:
+        lines.append("Разовые перерывы пока не настроены.")
+
+    return "\n".join(lines)
 
 
 @router.message(F.text == "⚙️ Настройки")
@@ -291,6 +382,190 @@ async def del_blacklist_date_callback(callback: types.CallbackQuery):
     await callback.answer()
 
 
+@router.callback_query(F.data == "manage_breaks")
+async def manage_breaks_callback(callback: types.CallbackQuery, state: FSMContext):
+    if not _is_admin(callback.from_user.id):
+        return
+    await callback.answer()
+    await state.clear()
+    blocked_slots = await database.get_blocked_slots()
+    await callback.message.edit_text(
+        _breaks_menu_text(blocked_slots),
+        parse_mode="HTML",
+        reply_markup=_breaks_menu_markup(blocked_slots),
+    )
+
+
+@router.callback_query(F.data == "configure_lunch_break")
+async def configure_lunch_break_callback(callback: types.CallbackQuery, state: FSMContext):
+    if not _is_admin(callback.from_user.id):
+        return
+    await callback.answer()
+    await state.clear()
+    await state.set_state(ConfigureLunchBreakForm.start_time)
+    lunch_enabled = bool(salon_config.get("lunch_break_enabled", False))
+    lunch_start = str(salon_config.get("lunch_break_start", "") or "").strip()
+    lunch_end = str(salon_config.get("lunch_break_end", "") or "").strip()
+    current_lunch = f"{lunch_start}-{lunch_end}" if lunch_enabled and lunch_start and lunch_end else "не настроен"
+    await callback.message.edit_text(
+        "🍽 <b>Обед</b>\n\n"
+        "Обед действует на все рабочие даты, включая будущие даты после текущего окна бронирования.\n"
+        f"Сейчас: <b>{current_lunch}</b>\n\n"
+        "Сначала выберите время начала.",
+        parse_mode="HTML",
+        reply_markup=keyboards.get_break_time_keyboard(
+            _build_break_start_options("lunch_start"),
+            back_callback="manage_breaks",
+            disable_callback="disable_lunch_break" if lunch_enabled else None,
+        ),
+    )
+
+
+@router.callback_query(F.data == "disable_lunch_break")
+async def disable_lunch_break_callback(callback: types.CallbackQuery, state: FSMContext):
+    if not _is_admin(callback.from_user.id):
+        return
+    await callback.answer("Обед выключен")
+    await state.clear()
+    update_config("lunch_break_enabled", False)
+    blocked_slots = await database.get_blocked_slots()
+    await callback.message.edit_text(
+        _breaks_menu_text(blocked_slots),
+        parse_mode="HTML",
+        reply_markup=_breaks_menu_markup(blocked_slots),
+    )
+
+
+@router.callback_query(F.data.startswith("lunch_start_"))
+async def lunch_break_start_callback(callback: types.CallbackQuery, state: FSMContext):
+    if not _is_admin(callback.from_user.id):
+        return
+    start_time = callback.data.removeprefix("lunch_start_")
+    await callback.answer()
+    await state.update_data(start_time=start_time)
+    await state.set_state(ConfigureLunchBreakForm.end_time)
+    await callback.message.edit_text(
+        "🍽 <b>Обед</b>\n\nВыберите время окончания. Перерыв будет применяться на все рабочие даты.",
+        parse_mode="HTML",
+        reply_markup=keyboards.get_break_time_keyboard(
+            _build_break_end_options("lunch_end", start_time),
+            back_callback="configure_lunch_break",
+            disable_callback="disable_lunch_break" if bool(salon_config.get("lunch_break_enabled", False)) else None,
+        ),
+    )
+
+
+@router.callback_query(F.data.startswith("lunch_end_"))
+async def lunch_break_end_callback(callback: types.CallbackQuery, state: FSMContext):
+    if not _is_admin(callback.from_user.id):
+        return
+    end_time = callback.data.removeprefix("lunch_end_")
+    data = await state.get_data()
+    start_time = data.get("start_time")
+    if not start_time or end_time <= start_time:
+        await callback.answer("Неверный интервал", show_alert=True)
+        return
+
+    update_config("lunch_break_start", start_time)
+    update_config("lunch_break_end", end_time)
+    update_config("lunch_break_enabled", True)
+    await state.clear()
+    await callback.answer("Обед сохранен")
+    blocked_slots = await database.get_blocked_slots()
+    await callback.message.edit_text(
+        _breaks_menu_text(blocked_slots),
+        parse_mode="HTML",
+        reply_markup=_breaks_menu_markup(blocked_slots),
+    )
+
+
+@router.callback_query(F.data == "start_single_break")
+async def start_single_break_callback(callback: types.CallbackQuery, state: FSMContext):
+    if not _is_admin(callback.from_user.id):
+        return
+    await callback.answer()
+    await state.clear()
+    date_options = _build_single_break_date_options()
+    if not date_options:
+        await callback.message.edit_text(
+            "🗓 <b>Отдельный перерыв</b>\n\nВ текущем окне записи нет рабочих дат для настройки разового перерыва.",
+            parse_mode="HTML",
+            reply_markup=keyboards.get_break_dates_keyboard([], back_callback="manage_breaks"),
+        )
+        return
+    await state.set_state(ConfigureSingleBreakForm.date)
+    await callback.message.edit_text(
+        "🗓 <b>Отдельный перерыв</b>\n\nЭтот перерыв действует только на одну дату. Выберите дату.",
+        parse_mode="HTML",
+        reply_markup=keyboards.get_break_dates_keyboard(date_options, back_callback="manage_breaks"),
+    )
+
+
+@router.callback_query(F.data.startswith("single_break_date_"))
+async def single_break_date_callback(callback: types.CallbackQuery, state: FSMContext):
+    if not _is_admin(callback.from_user.id):
+        return
+    date_str = callback.data.removeprefix("single_break_date_")
+    await callback.answer()
+    await state.update_data(date=date_str)
+    await state.set_state(ConfigureSingleBreakForm.start_time)
+    await callback.message.edit_text(
+        f"🗓 <b>Отдельный перерыв</b>\n\nДата: <b>{date_str}</b>\nВыберите время начала.",
+        parse_mode="HTML",
+        reply_markup=keyboards.get_break_time_keyboard(
+            _build_break_start_options("single_break_start"),
+            back_callback="start_single_break",
+        ),
+    )
+
+
+@router.callback_query(F.data.startswith("single_break_start_"))
+async def single_break_start_callback(callback: types.CallbackQuery, state: FSMContext):
+    if not _is_admin(callback.from_user.id):
+        return
+    start_time = callback.data.removeprefix("single_break_start_")
+    await callback.answer()
+    await state.update_data(start_time=start_time)
+    await state.set_state(ConfigureSingleBreakForm.end_time)
+    data = await state.get_data()
+    await callback.message.edit_text(
+        f"🗓 <b>Отдельный перерыв</b>\n\nДата: <b>{data.get('date')}</b>\nНачало: <b>{start_time}</b>\nВыберите время окончания.",
+        parse_mode="HTML",
+        reply_markup=keyboards.get_break_time_keyboard(
+            _build_break_end_options("single_break_end", start_time),
+            back_callback="start_single_break",
+        ),
+    )
+
+
+@router.callback_query(F.data.startswith("single_break_end_"))
+async def single_break_end_callback(callback: types.CallbackQuery, state: FSMContext):
+    if not _is_admin(callback.from_user.id):
+        return
+    end_time = callback.data.removeprefix("single_break_end_")
+    data = await state.get_data()
+    start_time = data.get("start_time")
+    date_str = data.get("date")
+    if not start_time or not date_str or end_time <= start_time:
+        await callback.answer("Неверный интервал", show_alert=True)
+        return
+
+    await database.add_blocked_slot(
+        date=date_str,
+        start_time=start_time,
+        end_time=end_time,
+        reason="Перерыв",
+    )
+    await state.clear()
+    await callback.answer("Перерыв сохранен")
+    blocked_slots = await database.get_blocked_slots()
+    await callback.message.edit_text(
+        _breaks_menu_text(blocked_slots),
+        parse_mode="HTML",
+        reply_markup=_breaks_menu_markup(blocked_slots),
+    )
+
+
 @router.callback_query(F.data == "manage_blocked_slots")
 async def manage_blocked_slots_callback(callback: types.CallbackQuery):
     if not _is_admin(callback.from_user.id):
@@ -394,6 +669,13 @@ async def delete_blocked_slot_callback(callback: types.CallbackQuery):
     blocked_slot_id = int(callback.data.split("_")[2])
     await database.delete_blocked_slot(blocked_slot_id)
     blocked_slots = await database.get_blocked_slots()
+    await callback.message.edit_text(
+        _breaks_menu_text(blocked_slots),
+        parse_mode="HTML",
+        reply_markup=_breaks_menu_markup(blocked_slots),
+    )
+    await callback.answer()
+    return
     await callback.message.edit_reply_markup(reply_markup=keyboards.get_blocked_slots_keyboard(blocked_slots))
     await callback.answer()
 

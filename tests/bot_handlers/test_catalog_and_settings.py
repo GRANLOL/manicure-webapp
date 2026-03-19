@@ -93,6 +93,32 @@ class CatalogHandlerTests(unittest.IsolatedAsyncioTestCase):
 
 
 class SettingsHandlerTests(unittest.IsolatedAsyncioTestCase):
+    async def test_manage_breaks_callback_renders_break_menu(self):
+        callback = make_callback(data="manage_breaks", user_id=1)
+        state = make_state()
+
+        with patch.object(settings_handlers, "getenv", return_value="1"), \
+             patch.object(settings_handlers.database, "get_blocked_slots", return_value=[]), \
+             patch.object(settings_handlers, "_breaks_menu_text", return_value="text"), \
+             patch.object(settings_handlers, "_breaks_menu_markup", return_value="kb"):
+            await settings_handlers.manage_breaks_callback(callback, state)
+
+        state.clear.assert_awaited_once()
+        callback.message.edit_text.assert_awaited_once_with("text", parse_mode="HTML", reply_markup="kb")
+
+    async def test_start_single_break_callback_uses_date_keyboard(self):
+        callback = make_callback(data="start_single_break", user_id=1)
+        state = make_state()
+
+        with patch.object(settings_handlers, "getenv", return_value="1"), \
+             patch.object(settings_handlers, "_build_single_break_date_options", return_value=[("single_break_date_21.03.2026", "21.03 (Сб)")]), \
+             patch.object(settings_handlers.keyboards, "get_break_dates_keyboard", return_value="kb"):
+            await settings_handlers.start_single_break_callback(callback, state)
+
+        state.clear.assert_awaited_once()
+        state.set_state.assert_awaited_once()
+        callback.message.edit_text.assert_awaited_once_with(ANY, parse_mode="HTML", reply_markup="kb")
+
     async def test_process_rem_time_2_rejects_invalid_hours(self):
         message = make_message(text="0")
         state = make_state()

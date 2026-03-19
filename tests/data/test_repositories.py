@@ -7,6 +7,7 @@ from unittest.mock import patch
 
 import aiosqlite
 
+import repositories.bookings as bookings_repo
 from repositories.analytics import (
     get_booking_status_stats,
     get_bookings_by_weekday,
@@ -17,9 +18,12 @@ from repositories.analytics import (
 )
 from repositories.bookings import (
     ActiveBookingLimitReachedError,
+    add_blocked_slot,
     cancel_booking_by_id,
     create_booking_if_available,
+    get_all_busy_slots,
     get_all_bookings,
+    get_busy_slots_by_date,
     reschedule_booking_if_available,
     search_bookings,
     update_booking_status,
@@ -94,6 +98,64 @@ class BookingRepositoryTests(RepositoryTestCase):
 
         self.assertTrue(first)
         self.assertTrue(second)
+
+    async def test_get_busy_slots_by_date_includes_lunch_break_metadata(self):
+        with patch.dict(
+            bookings_repo.salon_config,
+            {
+                "working_days": [0, 1, 2, 3, 4, 5, 6],
+                "blacklisted_dates": [],
+                "lunch_break_enabled": True,
+                "lunch_break_start": "13:00",
+                "lunch_break_end": "14:00",
+            },
+            clear=False,
+        ):
+            busy_slots = await get_busy_slots_by_date("14.03.2026")
+
+        self.assertTrue(any(slot["kind"] == "lunch" and slot["time"] == "13:00" for slot in busy_slots))
+
+    async def test_create_booking_rejects_overlap_with_single_break(self):
+        await add_blocked_slot("14.03.2026", "13:00", "14:00", reason="Перерыв")
+
+        blocked = await create_booking_if_available(
+            user_id=1,
+            name="Alice",
+            phone="+10000000001",
+            date="14.03.2026",
+            time="12:30",
+            duration=60,
+        )
+        allowed = await create_booking_if_available(
+            user_id=2,
+            name="Bob",
+            phone="+10000000002",
+            date="14.03.2026",
+            time="12:00",
+            duration=60,
+        )
+
+        self.assertFalse(blocked)
+        self.assertTrue(allowed)
+
+    async def test_get_all_busy_slots_generates_lunch_for_booking_window_dates(self):
+        with patch.dict(
+            bookings_repo.salon_config,
+            {
+                "booking_window": 2,
+                "working_days": [0, 1, 2, 3, 4, 5, 6],
+                "blacklisted_dates": [],
+                "lunch_break_enabled": True,
+                "lunch_break_start": "13:00",
+                "lunch_break_end": "14:00",
+            },
+            clear=False,
+        ), patch("repositories.bookings.get_salon_today", return_value=date(2026, 3, 20)):
+            busy_slots = await get_all_busy_slots()
+
+        self.assertIn("20.03.2026", busy_slots)
+        self.assertIn("21.03.2026", busy_slots)
+        self.assertTrue(any(slot["kind"] == "lunch" for slot in busy_slots["20.03.2026"]))
 
     async def test_revenue_stats_counts_only_completed_bookings_in_period(self):
         await create_booking_if_available(

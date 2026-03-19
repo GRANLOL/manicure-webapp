@@ -34,6 +34,40 @@ function getSalonTodayString(salonNow) {
     return `${sD}.${sM}.${salonNow.getFullYear()}`;
 }
 
+function getBusyInterval(busy) {
+    const [bH, bM] = busy.time.split(':').map(Number);
+    const start = bH * 60 + bM;
+    const end = start + (busy.duration || 60);
+    return { start, end };
+}
+
+function resolveBusyAvailabilityReason(busy, slotStart, slotEnd) {
+    const { start: busyStart, end: busyEnd } = getBusyInterval(busy);
+    if (!(slotStart < busyEnd && slotEnd > busyStart)) {
+        return null;
+    }
+
+    const kind = busy.kind || 'booking';
+    if (kind === 'booking') {
+        return { available: false, reason: 'busy_overlap', label: 'Занято' };
+    }
+
+    const startsInsideBreak = slotStart >= busyStart && slotStart < busyEnd;
+    if (kind === 'lunch') {
+        return {
+            available: false,
+            reason: startsInsideBreak ? 'lunch_break' : 'crosses_break',
+            label: startsInsideBreak ? (busy.label || 'Обед') : 'Не помещается',
+        };
+    }
+
+    return {
+        available: false,
+        reason: startsInsideBreak ? 'custom_break' : 'crosses_break',
+        label: startsInsideBreak ? (busy.label || 'Перерыв') : 'Не помещается',
+    };
+}
+
 export function getSlotAvailability(formattedDate, timeStr, durationOverride = null) {
     if (!formattedDate || !timeStr) {
         return { available: true, reason: null };
@@ -62,12 +96,9 @@ export function getSlotAvailability(formattedDate, timeStr, durationOverride = n
     }
 
     for (const busy of busyArr) {
-        const [bH, bM] = busy.time.split(':').map(Number);
-        const bStart = bH * 60 + bM;
-        const bEnd = bStart + (busy.duration || 60);
-
-        if (slotStart < bEnd && slotEnd > bStart) {
-            return { available: false, reason: 'busy_overlap' };
+        const busyAvailability = resolveBusyAvailabilityReason(busy, slotStart, slotEnd);
+        if (busyAvailability) {
+            return busyAvailability;
         }
     }
 
@@ -175,8 +206,6 @@ export function generateTimes(formattedDate = null) {
         return;
     }
 
-    const busyArr = formattedDate && store.busySlots[formattedDate] ? store.busySlots[formattedDate] : [];
-
     // Use regex to strictly extract HH:MM pairs, ignoring other text like day labels
     const timeMatch = store.workingHours.match(/(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})/);
     let startStr = '10:00', endStr = '20:00';
@@ -222,27 +251,24 @@ export function generateTimes(formattedDate = null) {
         const min = (m % 60).toString().padStart(2, '0');
         const timeStr = `${h}:${min}`;
 
-        const slotStart = m;
-        const slotEnd = m + serviceDur;
-
-        let isBusy = false;
-        for (const busy of busyArr) {
-            const [bH, bM] = busy.time.split(':').map(Number);
-            const bStart = bH * 60 + bM;
-            const bEnd = bStart + (busy.duration || 60);
-
-            if (slotStart < bEnd && slotEnd > bStart) {
-                isBusy = true;
-                break;
-            }
-        }
-
         const slot = document.createElement('div');
         slot.className = 'time-slot fade-in';
-        slot.textContent = timeStr;
+        const availability = getSlotAvailability(formattedDate, timeStr);
+        const content = document.createElement('div');
+        content.className = 'time-slot-content';
 
-        if (isBusy) {
+        const timeLabel = document.createElement('span');
+        timeLabel.className = 'time-slot-time';
+        timeLabel.textContent = timeStr;
+        content.appendChild(timeLabel);
+
+        if (!availability.available) {
             slot.classList.add('slot-busy');
+            slot.classList.add(`slot-${availability.reason.replace(/_/g, '-')}`);
+            const note = document.createElement('span');
+            note.className = 'time-slot-note';
+            note.textContent = availability.label || 'Недоступно';
+            content.appendChild(note);
         } else {
             slot.onclick = () => selectTime(slot, timeStr);
             if (store.selectedTime === timeStr) {
@@ -250,6 +276,7 @@ export function generateTimes(formattedDate = null) {
             }
         }
 
+        slot.appendChild(content);
         timeGrid.appendChild(slot);
         renderedSlots += 1;
     }

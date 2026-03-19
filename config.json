@@ -46,6 +46,9 @@
   ],
   "booking_window": 14,
   "max_active_bookings_per_user": 3,
+  "lunch_break_enabled": false,
+  "lunch_break_start": "13:00",
+  "lunch_break_end": "14:00",
   "show_service_duration": true,
   "webapp_auth_required": true,
   "working_days": [

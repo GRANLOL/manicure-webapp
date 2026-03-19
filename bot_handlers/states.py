@@ -82,6 +82,17 @@ class AddBlockedSlotForm(StatesGroup):
     reason = State()
 
 
+class ConfigureLunchBreakForm(StatesGroup):
+    start_time = State()
+    end_time = State()
+
+
+class ConfigureSingleBreakForm(StatesGroup):
+    date = State()
+    start_time = State()
+    end_time = State()
+
+
 class EditCurrencyForm(StatesGroup):
     symbol = State()
 
