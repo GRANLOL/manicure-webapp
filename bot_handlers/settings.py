@@ -271,7 +271,7 @@ async def process_bot_about_text(message: types.Message, state: FSMContext):
 async def edit_rem_text_1_cb(callback: types.CallbackQuery, state: FSMContext):
     await state.set_state(EditReminderSettingsForm.text_1)
     await callback.message.answer(
-        "??????? ????? ????? ??? <b>??????? ???????????</b>."
+        "Введите новый текст для <b>первого напоминания</b>."
         + _reminder_template_examples(),
         parse_mode="HTML",
         reply_markup=keyboards.get_cancel_admin_action_keyboard(),
@@ -283,7 +283,7 @@ async def edit_rem_text_1_cb(callback: types.CallbackQuery, state: FSMContext):
 async def edit_rem_text_2_cb(callback: types.CallbackQuery, state: FSMContext):
     await state.set_state(EditReminderSettingsForm.text_2)
     await callback.message.answer(
-        "??????? ????? ????? ??? <b>??????? ???????????</b>."
+        "Введите новый текст для <b>второго напоминания</b>."
         + _reminder_template_examples(),
         parse_mode="HTML",
         reply_markup=keyboards.get_cancel_admin_action_keyboard(),
