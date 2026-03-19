@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import re
 
@@ -12,6 +12,7 @@ from .states import (
     AddBookingWindowForm,
     ConfigureLunchBreakForm,
     ConfigureSingleBreakForm,
+    EditBotProfileTextForm,
     EditCurrencyForm,
     EditReminderSettingsForm,
     EditTimezoneForm,
@@ -20,6 +21,9 @@ from .states import (
 )
 
 router = Router()
+
+DESCRIPTION_MAX_LENGTH = 512
+ABOUT_TEXT_MAX_LENGTH = 120
 
 
 def _is_admin(user_id: int) -> bool:
@@ -31,6 +35,22 @@ def _schedule_markup():
     return keyboards.get_working_days_keyboard(
         salon_config.get("working_days", [1, 2, 3, 4, 5, 6, 0]),
         salon_config.get("blacklisted_dates", []),
+    )
+
+
+def _get_current_bot_text(key: str) -> str:
+    value = str(salon_config.get(key, "") or "").strip()
+    return value or "Не задано"
+
+
+def _reminder_template_examples() -> str:
+    return (
+        "\n\nДоступные переменные:\n"
+        "<code>{name}</code> - имя клиента\n"
+        "<code>{date}</code> - дата записи\n"
+        "<code>{time}</code> - время записи\n\n"
+        "Пример:\n"
+        "<code>Здравствуйте, {name}! Напоминаем о записи {date} в {time}.</code>"
     )
 
 
@@ -150,17 +170,124 @@ async def settings_reminders_callback(callback: types.CallbackQuery):
     await callback.message.edit_text(text, parse_mode="HTML", reply_markup=keyboards.get_reminder_settings_keyboard())
 
 
+@router.callback_query(F.data == "settings_bot_texts")
+async def settings_bot_texts_callback(callback: types.CallbackQuery):
+    if not _is_admin(callback.from_user.id):
+        return
+    await callback.answer()
+    await callback.message.edit_text(
+        "🤖 <b>Тексты бота</b>\n\n"
+        f"Описание профиля: <b>{_get_current_bot_text('bot_description')}</b>\n\n"
+        f"Текст пустого чата: <b>{_get_current_bot_text('bot_about_text')}</b>\n\n"
+        "Здесь можно настроить текст профиля бота и краткий текст для пустого чата.",
+        parse_mode="HTML",
+        reply_markup=keyboards.get_bot_texts_keyboard(),
+    )
+
+
+@router.callback_query(F.data == "edit_bot_description")
+async def edit_bot_description_callback(callback: types.CallbackQuery, state: FSMContext):
+    if not _is_admin(callback.from_user.id):
+        return
+    await state.set_state(EditBotProfileTextForm.description)
+    await callback.message.answer(
+        "Введите новое <b>описание профиля</b> бота.\n\n"
+        "Этот текст показывается в профиле бота при его открытии.\n"
+        "Чтобы очистить описание, отправьте <code>-</code>.",
+        parse_mode="HTML",
+        reply_markup=keyboards.get_cancel_admin_action_keyboard("back_to_settings", "← Назад в настройки"),
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data == "edit_bot_about")
+async def edit_bot_about_callback(callback: types.CallbackQuery, state: FSMContext):
+    if not _is_admin(callback.from_user.id):
+        return
+    await state.set_state(EditBotProfileTextForm.about)
+    await callback.message.answer(
+        "Введите новый <b>текст пустого чата</b>.\n\n"
+        "Этот краткий текст показывается в шапке и в пустом чате с ботом.\n"
+        "Чтобы очистить текст, отправьте <code>-</code>.",
+        parse_mode="HTML",
+        reply_markup=keyboards.get_cancel_admin_action_keyboard("back_to_settings", "← Назад в настройки"),
+    )
+    await callback.answer()
+
+
+@router.message(EditBotProfileTextForm.description)
+async def process_bot_description_text(message: types.Message, state: FSMContext):
+    value = (message.text or "").strip()
+    if value == "-":
+        value = ""
+    if len(value) > DESCRIPTION_MAX_LENGTH:
+        await message.answer(
+            f"Описание должно быть не длиннее {DESCRIPTION_MAX_LENGTH} символов.",
+            reply_markup=keyboards.get_cancel_admin_action_keyboard("back_to_settings", "← Назад в настройки"),
+        )
+        return
+
+    try:
+        await message.bot.set_my_description(description=value or None)
+    except Exception:
+        await message.answer(
+            "Не удалось обновить описание профиля через Telegram API. Попробуйте позже.",
+            reply_markup=keyboards.get_bot_texts_keyboard(),
+        )
+        return
+
+    update_config("bot_description", value)
+    await state.clear()
+    await message.answer("✅ Описание профиля обновлено.", reply_markup=keyboards.get_bot_texts_keyboard())
+
+
+@router.message(EditBotProfileTextForm.about)
+async def process_bot_about_text(message: types.Message, state: FSMContext):
+    value = (message.text or "").strip()
+    if value == "-":
+        value = ""
+    if len(value) > ABOUT_TEXT_MAX_LENGTH:
+        await message.answer(
+            f"Текст пустого чата должен быть не длиннее {ABOUT_TEXT_MAX_LENGTH} символов.",
+            reply_markup=keyboards.get_cancel_admin_action_keyboard("back_to_settings", "← Назад в настройки"),
+        )
+        return
+
+    try:
+        await message.bot.set_my_short_description(short_description=value or None)
+    except Exception:
+        await message.answer(
+            "Не удалось обновить текст пустого чата через Telegram API. Попробуйте позже.",
+            reply_markup=keyboards.get_bot_texts_keyboard(),
+        )
+        return
+
+    update_config("bot_about_text", value)
+    await state.clear()
+    await message.answer("✅ Текст пустого чата обновлен.", reply_markup=keyboards.get_bot_texts_keyboard())
+
+
 @router.callback_query(F.data == "edit_rem_text_1")
 async def edit_rem_text_1_cb(callback: types.CallbackQuery, state: FSMContext):
     await state.set_state(EditReminderSettingsForm.text_1)
-    await callback.message.answer("Введите новый текст для <b>первого напоминания</b>.", parse_mode="HTML", reply_markup=keyboards.get_cancel_admin_action_keyboard())
+    await callback.message.answer(
+        "Р’РІРµРґРёС‚Рµ РЅРѕРІС‹Р№ С‚РµРєСЃС‚ РґР»СЏ <b>РїРµСЂРІРѕРіРѕ РЅР°РїРѕРјРёРЅР°РЅРёСЏ</b>."
+        + _reminder_template_examples(),
+        parse_mode="HTML",
+        reply_markup=keyboards.get_cancel_admin_action_keyboard(),
+    )
     await callback.answer()
 
 
 @router.callback_query(F.data == "edit_rem_text_2")
 async def edit_rem_text_2_cb(callback: types.CallbackQuery, state: FSMContext):
     await state.set_state(EditReminderSettingsForm.text_2)
-    await callback.message.answer("Введите новый текст для <b>второго напоминания</b>.", parse_mode="HTML", reply_markup=keyboards.get_cancel_admin_action_keyboard())
+    await callback.message.answer(
+        "Р’РІРµРґРёС‚Рµ РЅРѕРІС‹Р№ С‚РµРєСЃС‚ РґР»СЏ <b>РІС‚РѕСЂРѕРіРѕ РЅР°РїРѕРјРёРЅР°РЅРёСЏ</b>."
+        + _reminder_template_examples(),
+        parse_mode="HTML",
+        reply_markup=keyboards.get_cancel_admin_action_keyboard(),
+    )
     await callback.answer()
 
 

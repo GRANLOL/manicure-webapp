@@ -17,6 +17,11 @@ class EditReminderSettingsForm(StatesGroup):
     time_2 = State()
 
 
+class EditBotProfileTextForm(StatesGroup):
+    description = State()
+    about = State()
+
+
 class EditTimezoneForm(StatesGroup):
     offset = State()
 

@@ -52,6 +52,7 @@ def get_system_settings_keyboard():
     builder = InlineKeyboardBuilder()
     duration_enabled = bool(salon_config.get("show_service_duration", True))
     builder.row(InlineKeyboardButton(text="🔔 Настройки напоминаний", callback_data="settings_reminders"))
+    builder.row(InlineKeyboardButton(text="🤖 Тексты бота", callback_data="settings_bot_texts"))
     builder.row(InlineKeyboardButton(text="🕒 Часовой пояс (UTC)", callback_data="settings_timezone"))
     builder.row(InlineKeyboardButton(text="🕔 Часы работы", callback_data="settings_working_hours"))
     builder.row(InlineKeyboardButton(text="🧭 Шаг записи", callback_data="settings_interval"))
@@ -63,7 +64,7 @@ def get_system_settings_keyboard():
     )
     builder.row(
         InlineKeyboardButton(
-            text=f"± Длительность услуг: {'вкл' if duration_enabled else 'выкл'}",
+            text=f"⏱ Длительность услуг: {'вкл' if duration_enabled else 'выкл'}",
             callback_data="toggle_service_duration_visibility",
         )
     )
@@ -78,6 +79,17 @@ def get_reminder_settings_keyboard():
     builder.row(InlineKeyboardButton(text="✏️ Текст за 24 часа", callback_data="edit_rem_text_1"))
     builder.row(InlineKeyboardButton(text="✏️ Текст второго уведомления", callback_data="edit_rem_text_2"))
     builder.row(InlineKeyboardButton(text="🕒 Время второго уведомления", callback_data="edit_rem_time_2"))
+    builder.row(InlineKeyboardButton(text="← Назад в настройки", callback_data="back_to_settings"))
+    builder.row(InlineKeyboardButton(text="❌ Отмена", callback_data="cancel_admin_action"))
+    return builder.as_markup()
+
+
+def get_bot_texts_keyboard():
+    from aiogram.utils.keyboard import InlineKeyboardBuilder
+
+    builder = InlineKeyboardBuilder()
+    builder.row(InlineKeyboardButton(text="📝 Описание профиля", callback_data="edit_bot_description"))
+    builder.row(InlineKeyboardButton(text="💬 Текст пустого чата", callback_data="edit_bot_about"))
     builder.row(InlineKeyboardButton(text="← Назад в настройки", callback_data="back_to_settings"))
     builder.row(InlineKeyboardButton(text="❌ Отмена", callback_data="cancel_admin_action"))
     return builder.as_markup()

@@ -1,4 +1,5 @@
 import unittest
+from unittest.mock import AsyncMock
 from unittest.mock import ANY, patch
 
 import bot_handlers.catalog as catalog_handlers
@@ -93,6 +94,43 @@ class CatalogHandlerTests(unittest.IsolatedAsyncioTestCase):
 
 
 class SettingsHandlerTests(unittest.IsolatedAsyncioTestCase):
+    async def test_settings_bot_texts_callback_renders_bot_text_menu(self):
+        callback = make_callback(data="settings_bot_texts", user_id=1)
+
+        with patch.object(settings_handlers, "getenv", return_value="1"), \
+             patch.object(settings_handlers.keyboards, "get_bot_texts_keyboard", return_value="kb"), \
+             patch.dict(settings_handlers.salon_config, {"bot_description": "desc", "bot_about_text": "about"}, clear=False):
+            await settings_handlers.settings_bot_texts_callback(callback)
+
+        callback.message.edit_text.assert_awaited_once_with(ANY, parse_mode="HTML", reply_markup="kb")
+        callback.answer.assert_awaited_once()
+
+    async def test_process_bot_description_text_updates_telegram_and_config(self):
+        message = make_message(text="New description")
+        message.bot.set_my_description = AsyncMock()
+        state = make_state()
+
+        with patch.object(settings_handlers, "update_config") as update_mock, \
+             patch.object(settings_handlers.keyboards, "get_bot_texts_keyboard", return_value="kb"):
+            await settings_handlers.process_bot_description_text(message, state)
+
+        message.bot.set_my_description.assert_awaited_once_with(description="New description")
+        update_mock.assert_called_once_with("bot_description", "New description")
+        state.clear.assert_awaited_once()
+        message.answer.assert_awaited_once_with("✅ Описание профиля обновлено.", reply_markup="kb")
+
+    async def test_process_bot_about_text_validates_length(self):
+        message = make_message(text="x" * 121)
+        message.bot.set_my_short_description = AsyncMock()
+        state = make_state()
+
+        with patch.object(settings_handlers.keyboards, "get_cancel_admin_action_keyboard", return_value="kb"):
+            await settings_handlers.process_bot_about_text(message, state)
+
+        message.bot.set_my_short_description.assert_not_awaited()
+        message.answer.assert_awaited_once_with(ANY, reply_markup="kb")
+        state.clear.assert_not_awaited()
+
     async def test_manage_breaks_callback_renders_break_menu(self):
         callback = make_callback(data="manage_breaks", user_id=1)
         state = make_state()

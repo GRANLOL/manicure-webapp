@@ -46,6 +46,8 @@
   ],
   "booking_window": 14,
   "max_active_bookings_per_user": 3,
+  "bot_description": "",
+  "bot_about_text": "",
   "lunch_break_enabled": false,
   "lunch_break_start": "13:00",
   "lunch_break_end": "14:00",
