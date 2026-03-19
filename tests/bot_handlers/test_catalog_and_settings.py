@@ -107,14 +107,14 @@ class SettingsHandlerTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_process_bot_description_text_updates_telegram_and_config(self):
         message = make_message(text="New description")
-        message.bot.set_my_description = AsyncMock()
+        message.bot.set_my_short_description = AsyncMock()
         state = make_state()
 
         with patch.object(settings_handlers, "update_config") as update_mock, \
              patch.object(settings_handlers.keyboards, "get_bot_texts_keyboard", return_value="kb"):
             await settings_handlers.process_bot_description_text(message, state)
 
-        message.bot.set_my_description.assert_awaited_once_with(description="New description")
+        message.bot.set_my_short_description.assert_awaited_once_with(short_description="New description")
         update_mock.assert_called_once_with("bot_description", "New description")
         state.clear.assert_awaited_once()
         message.answer.assert_awaited_once_with("✅ Описание профиля обновлено.", reply_markup="kb")
@@ -130,6 +130,20 @@ class SettingsHandlerTests(unittest.IsolatedAsyncioTestCase):
         message.bot.set_my_short_description.assert_not_awaited()
         message.answer.assert_awaited_once_with(ANY, reply_markup="kb")
         state.clear.assert_not_awaited()
+
+    async def test_process_bot_about_text_updates_telegram_description_and_config(self):
+        message = make_message(text="New about")
+        message.bot.set_my_description = AsyncMock()
+        state = make_state()
+
+        with patch.object(settings_handlers, "update_config") as update_mock, \
+             patch.object(settings_handlers.keyboards, "get_bot_texts_keyboard", return_value="kb"):
+            await settings_handlers.process_bot_about_text(message, state)
+
+        message.bot.set_my_description.assert_awaited_once_with(description="New about")
+        update_mock.assert_called_once_with("bot_about_text", "New about")
+        state.clear.assert_awaited_once()
+        message.answer.assert_awaited_once_with("✅ Текст пустого чата обновлен.", reply_markup="kb")
 
     async def test_manage_breaks_callback_renders_break_menu(self):
         callback = make_callback(data="manage_breaks", user_id=1)

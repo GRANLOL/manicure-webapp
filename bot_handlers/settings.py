@@ -192,7 +192,7 @@ async def edit_bot_description_callback(callback: types.CallbackQuery, state: FS
     await state.set_state(EditBotProfileTextForm.description)
     await callback.message.answer(
         "Введите новое <b>описание профиля</b> бота.\n\n"
-        "Этот текст показывается в профиле бота при его открытии.\n"
+        "Этот текст показывается в пустом чате с ботом.\n"
         "Чтобы очистить описание, отправьте <code>-</code>.",
         parse_mode="HTML",
         reply_markup=keyboards.get_cancel_admin_action_keyboard("back_to_settings", "← Назад в настройки"),
@@ -207,7 +207,7 @@ async def edit_bot_about_callback(callback: types.CallbackQuery, state: FSMConte
     await state.set_state(EditBotProfileTextForm.about)
     await callback.message.answer(
         "Введите новый <b>текст пустого чата</b>.\n\n"
-        "Этот краткий текст показывается в шапке и в пустом чате с ботом.\n"
+        "Этот краткий текст показывается в профиле бота и в шапке.\n"
         "Чтобы очистить текст, отправьте <code>-</code>.",
         parse_mode="HTML",
         reply_markup=keyboards.get_cancel_admin_action_keyboard("back_to_settings", "← Назад в настройки"),
@@ -228,7 +228,7 @@ async def process_bot_description_text(message: types.Message, state: FSMContext
         return
 
     try:
-        await message.bot.set_my_description(description=value or None)
+        await message.bot.set_my_short_description(short_description=value or None)
     except Exception:
         await message.answer(
             "Не удалось обновить описание профиля через Telegram API. Попробуйте позже.",
@@ -254,7 +254,7 @@ async def process_bot_about_text(message: types.Message, state: FSMContext):
         return
 
     try:
-        await message.bot.set_my_short_description(short_description=value or None)
+        await message.bot.set_my_description(description=value or None)
     except Exception:
         await message.answer(
             "Не удалось обновить текст пустого чата через Telegram API. Попробуйте позже.",
@@ -271,7 +271,7 @@ async def process_bot_about_text(message: types.Message, state: FSMContext):
 async def edit_rem_text_1_cb(callback: types.CallbackQuery, state: FSMContext):
     await state.set_state(EditReminderSettingsForm.text_1)
     await callback.message.answer(
-        "Р’РІРµРґРёС‚Рµ РЅРѕРІС‹Р№ С‚РµРєСЃС‚ РґР»СЏ <b>РїРµСЂРІРѕРіРѕ РЅР°РїРѕРјРёРЅР°РЅРёСЏ</b>."
+        "??????? ????? ????? ??? <b>??????? ???????????</b>."
         + _reminder_template_examples(),
         parse_mode="HTML",
         reply_markup=keyboards.get_cancel_admin_action_keyboard(),
@@ -283,7 +283,7 @@ async def edit_rem_text_1_cb(callback: types.CallbackQuery, state: FSMContext):
 async def edit_rem_text_2_cb(callback: types.CallbackQuery, state: FSMContext):
     await state.set_state(EditReminderSettingsForm.text_2)
     await callback.message.answer(
-        "Р’РІРµРґРёС‚Рµ РЅРѕРІС‹Р№ С‚РµРєСЃС‚ РґР»СЏ <b>РІС‚РѕСЂРѕРіРѕ РЅР°РїРѕРјРёРЅР°РЅРёСЏ</b>."
+        "??????? ????? ????? ??? <b>??????? ???????????</b>."
         + _reminder_template_examples(),
         parse_mode="HTML",
         reply_markup=keyboards.get_cancel_admin_action_keyboard(),
