@@ -141,9 +141,24 @@ export function hasAvailableSlots(formattedDate, durationOverride = null) {
     return false; // No available slots found for this date
 }
 
+function renderDateEmptyState(dateContainer) {
+    dateContainer.classList.add('date-container--empty');
+
+    const emptyState = document.createElement('div');
+    emptyState.className = 'date-container-empty';
+    emptyState.textContent = 'Выберите услугу, чтобы посмотреть доступные даты.';
+    dateContainer.appendChild(emptyState);
+}
+
 export function generateDates() {
     const dateContainer = document.getElementById('date-container');
     dateContainer.innerHTML = '';
+    dateContainer.classList.remove('date-container--empty');
+
+    if (!store.selectedService) {
+        renderDateEmptyState(dateContainer);
+        return;
+    }
 
     // Calculate current time in salon's timezone
     const nowLocal = new Date();

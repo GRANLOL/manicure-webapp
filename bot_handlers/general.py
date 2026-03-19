@@ -220,7 +220,7 @@ async def send_client_home(message: types.Message, *, text: str, is_admin: bool)
         reply_markup=keyboards.get_booking_launch_keyboard(),
     )
     await message.answer(
-        "👤 <b>Личный кабинет</b>\n\n"
+        "👤 <b>Клиентское меню</b>\n\n"
         "Здесь можно посмотреть свои записи, историю и быстро вернуться к оформлению новой записи.",
         parse_mode="HTML",
         reply_markup=keyboards.get_main_menu(is_admin=is_admin),
@@ -240,12 +240,8 @@ async def start_handler(message: types.Message):
         )
         return
 
-    welcome_text = salon_config.get(
-        "welcome_text",
-        "📅 <b>Онлайн-запись</b>\n\nВыберите удобное время и оформите запись онлайн.",
-    )
+    welcome_text = salon_config.get("welcome_text", "Привет! Выберите нужное действие:")
     await send_client_home(message, text=welcome_text, is_admin=is_admin)
-
 
 @router.message(F.text == "👤 Главное меню")
 @router.message(F.text == "👤 Меню клиента")
@@ -256,9 +252,14 @@ async def client_menu_handler(message: types.Message):
         return
     await send_client_home(
         message,
-        text="📅 <b>Онлайн-запись</b>\n\nВыберите удобное время и оформите запись онлайн.",
+        text=(
+            "👤 <b>Клиентский кабинет</b>\n\n"
+            "Откройте запись, чтобы выбрать услугу, дату и удобное время. "
+            "Актуальные записи и дополнительные действия доступны ниже."
+        ),
         is_admin=is_admin,
     )
+
 
 
 @router.message(Command("admin"))
