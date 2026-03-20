@@ -73,6 +73,15 @@ function applyHeaderBranding() {
     }
 }
 
+function revealInitialView() {
+    window.requestAnimationFrame(() => {
+        window.requestAnimationFrame(() => {
+            document.body.classList.remove('app-booting');
+            document.body.classList.add('app-ready');
+        });
+    });
+}
+
 // --- A. Configuration Injection ---
 applyHeaderBranding();
 
@@ -99,12 +108,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     initModal();
     initPrivacyModal();
 
-    // Fetching data
-    await fetchContent();
-    await fetchBusySlots();
+    try {
+        // Fetching data
+        await fetchContent();
+        await fetchBusySlots();
 
-    // Initial Render
-    populateServices();
-    generateDates();
-    generateTimes();
+        // Initial Render
+        populateServices();
+        generateDates();
+        generateTimes();
+    } finally {
+        revealInitialView();
+    }
 });

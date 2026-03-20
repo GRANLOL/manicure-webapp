@@ -76,6 +76,28 @@ body {
     margin: 0 auto;
 }
 
+body.app-booting .app-wrapper {
+    opacity: 0;
+    transform: translateY(10px) scale(0.992);
+}
+
+body.app-ready .app-wrapper {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    transition:
+        opacity 0.2s ease-out,
+        transform 0.24s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    body.app-booting .app-wrapper,
+    body.app-ready .app-wrapper {
+        opacity: 1;
+        transform: none;
+        transition: none;
+    }
+}
+
 /* --- Header Section (Now inside the wrapper flow) --- */
 .salon-header {
     background-color: var(--header-bg);
