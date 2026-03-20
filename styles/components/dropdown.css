@@ -91,7 +91,6 @@ body.dropdown-open::before {
     top: 100%;
     left: -1px;
     right: -1px;
-    width: calc(100% + 2px);
     background: rgba(20, 20, 20, 0.68);
     border: 1px solid var(--accent-color);
     border-top: none;
