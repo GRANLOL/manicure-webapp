@@ -44,8 +44,18 @@
 }
 
 @keyframes slowPulse {
-    0% { opacity: 0.7; }
-    100% { opacity: 1; }
+    0% {
+        box-shadow: 0 0 0 rgba(212, 175, 55, 0);
+        border-color: rgba(255, 255, 255, 0.05);
+    }
+    50% {
+        box-shadow: 0 0 16px rgba(212, 175, 55, 0.15);
+        border-color: rgba(212, 175, 55, 0.3);
+    }
+    100% {
+        box-shadow: 0 0 0 rgba(212, 175, 55, 0);
+        border-color: rgba(255, 255, 255, 0.05);
+    }
 }
 
 .skeleton-date {

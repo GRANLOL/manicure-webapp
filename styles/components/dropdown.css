@@ -93,7 +93,7 @@ body.dropdown-open::before {
     right: -1px;
     width: calc(100% + 2px);
     background: rgba(20, 20, 20, 0.68);
-    border: 1px solid rgba(226, 197, 98, 0.35);
+    border: 1px solid var(--accent-color);
     border-top: none;
     border-bottom-left-radius: var(--border-radius);
     border-bottom-right-radius: var(--border-radius);
