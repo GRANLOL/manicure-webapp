@@ -76,7 +76,7 @@ function applyHeaderBranding() {
 function revealInitialView() {
     const bootStartedAt = Number(document.body.dataset.bootStartedAt || Date.now());
     const elapsed = Date.now() - bootStartedAt;
-    const minVisibleBootMs = 90;
+    const minVisibleBootMs = 150;
     const reveal = () => {
         window.requestAnimationFrame(() => {
             document.body.classList.remove('app-booting');
