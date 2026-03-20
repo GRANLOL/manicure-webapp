@@ -17,7 +17,9 @@ body.dropdown-open::before {
     content: "";
     position: fixed;
     inset: 0;
-    background: rgba(8, 8, 8, 0.14);
+    background: rgba(8, 8, 8, 0.18);
+    backdrop-filter: blur(1.5px);
+    -webkit-backdrop-filter: blur(1.5px);
     pointer-events: none;
     z-index: 8;
 }
@@ -90,7 +92,9 @@ body.dropdown-open::before {
     left: -1px;
     right: -1px;
     width: calc(100% + 2px);
-    background: rgba(20, 20, 20, 0.96);
+    background: rgba(20, 20, 20, 0.92);
+    backdrop-filter: blur(5px);
+    -webkit-backdrop-filter: blur(5px);
     border: 1px solid rgba(226, 197, 98, 0.35);
     border-top: none;
     border-bottom-left-radius: var(--border-radius);

@@ -74,12 +74,24 @@ function applyHeaderBranding() {
 }
 
 function revealInitialView() {
-    window.requestAnimationFrame(() => {
+    const bootStartedAt = Number(document.body.dataset.bootStartedAt || Date.now());
+    const elapsed = Date.now() - bootStartedAt;
+    const minVisibleBootMs = 120;
+    const reveal = () => {
         window.requestAnimationFrame(() => {
-            document.body.classList.remove('app-booting');
-            document.body.classList.add('app-ready');
+            window.requestAnimationFrame(() => {
+                document.body.classList.remove('app-booting');
+                document.body.classList.add('app-ready');
+            });
         });
-    });
+    };
+
+    if (elapsed >= minVisibleBootMs) {
+        reveal();
+        return;
+    }
+
+    window.setTimeout(reveal, minVisibleBootMs - elapsed);
 }
 
 // --- A. Configuration Injection ---
@@ -87,6 +99,7 @@ applyHeaderBranding();
 
 // --- G. Initialization ---
 document.addEventListener('DOMContentLoaded', async () => {
+    document.body.dataset.bootStartedAt = String(Date.now());
     // Implement Passive Event Listeners for touch events to prevent scroll-blocking
     document.addEventListener('touchstart', function () { }, { passive: true });
     document.addEventListener('touchmove', function () { }, { passive: true });
