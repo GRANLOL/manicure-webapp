@@ -185,7 +185,7 @@ export function createServiceOption(serviceObj) {
         optionDiv.setAttribute('aria-disabled', 'true');
         optionDiv.title = getUnavailableServiceMessage(availability.reason);
     }
-    if (store.selectedService === serviceObj.name) {
+    if (store.selectedServiceId === serviceObj.id) {
         optionDiv.classList.add('selected');
     }
 
@@ -211,6 +211,7 @@ export function createServiceOption(serviceObj) {
         optionDiv.classList.add('selected');
 
         closeDropdown();
+        store.selectedServiceId = serviceObj.id ?? null;
         store.selectedService = serviceObj.name;
         store.selectedDuration = serviceObj.duration || 60;
         store.selectedPrice = parseInt((serviceObj.price || '0').replace(/\D/g, '')) || 0;
@@ -225,7 +226,8 @@ export function populateServices(searchQuery = '') {
     const resultsContainer = document.getElementById('service-results');
     resultsContainer.innerHTML = '';
 
-    const selectedServiceObj = store.dynamicServices.find(service => service.name === store.selectedService);
+    const selectedServiceObj = store.dynamicServices.find(service => service.id === store.selectedServiceId)
+        ?? store.dynamicServices.find(service => service.name === store.selectedService);
     renderTriggerLabel(selectedServiceObj ?? null);
 
     if (searchQuery.trim().length > 0) {

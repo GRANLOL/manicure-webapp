@@ -2,6 +2,7 @@ import { config } from './config.js';
 
 // Central State Management
 export const store = {
+    selectedServiceId: null,
     selectedService: null,
     selectedDate: null,
     selectedTime: null,
