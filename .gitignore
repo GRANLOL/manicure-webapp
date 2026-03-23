@@ -14,3 +14,5 @@ run_stderr.log
 local_*.log
 .test_tmp/
 backups/
+logs/
+runtime/
