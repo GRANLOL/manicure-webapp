@@ -176,7 +176,7 @@ async def process_edit_service_duration(message: types.Message, state: FSMContex
     await state.clear()
 
     service = await database.get_service_by_id(srv_id)
-    await message.answer(_format_service_card(service, "Длительность изменена"), reply_markup=keyboards.get_service_edit_keyboard(service))
+    await message.answer(_format_service_card(service, "Длительность изменена"), parse_mode="HTML", reply_markup=keyboards.get_service_edit_keyboard(service))
 
 
 @router.callback_query(F.data.startswith("eds_cat_"))
@@ -218,7 +218,7 @@ async def manage_categories_handler(message: types.Message):
     if not categories:
         await message.answer("📁 <b>Список категорий пуст</b>", parse_mode="HTML", reply_markup=keyboards.get_categories_keyboard(categories))
     else:
-        await message.answer(build_category_list_text(categories), reply_markup=keyboards.get_categories_keyboard(categories))
+        await message.answer(build_category_list_text(categories), parse_mode="HTML", reply_markup=keyboards.get_categories_keyboard(categories))
 
 
 @router.callback_query(F.data.startswith("del_cat_"))
@@ -232,7 +232,7 @@ async def del_category_callback(callback: types.CallbackQuery):
     categories = await database.get_all_categories()
 
     text = "✅ Категория удалена.\n" + build_category_list_text(categories)
-    await callback.message.edit_text(text, reply_markup=keyboards.get_categories_keyboard(categories))
+    await callback.message.edit_text(text, parse_mode="HTML", reply_markup=keyboards.get_categories_keyboard(categories))
 
 
 @router.callback_query(F.data.startswith("edit_cat_"))
@@ -258,7 +258,7 @@ async def back_to_categories_callback(callback: types.CallbackQuery, state: FSMC
     if not categories:
         await callback.message.edit_text("📁 <b>Список категорий пуст</b>", parse_mode="HTML", reply_markup=keyboards.get_categories_keyboard(categories))
     else:
-        await callback.message.edit_text(build_category_list_text(categories), reply_markup=keyboards.get_categories_keyboard(categories))
+        await callback.message.edit_text(build_category_list_text(categories), parse_mode="HTML", reply_markup=keyboards.get_categories_keyboard(categories))
 
 
 @router.callback_query(F.data.startswith("edc_name_"))
