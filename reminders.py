@@ -93,7 +93,19 @@ async def send_admin_daily_digest(bot: Bot) -> None:
         return
 
     salon_now = get_salon_now()
-    digest_hour = int(salon_config.get("admin_digest_hour", 9) or 9)
+    
+    digest_hour_raw = salon_config.get("admin_digest_hour")
+    if digest_hour_raw is not None:
+        try:
+            digest_hour = int(digest_hour_raw)
+        except ValueError:
+            digest_hour = 9
+    else:
+        import re
+        working_hours = str(salon_config.get("working_hours", "10:00-20:00") or "")
+        match = re.search(r"(\d{1,2}):\d{2}", working_hours)
+        digest_hour = int(match.group(1)) if match else 9
+
     today_key = salon_now.date().isoformat()
     if salon_now.hour < digest_hour or get_runtime_value("last_admin_digest_date") == today_key:
         return
