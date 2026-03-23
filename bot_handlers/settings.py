@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import re
 
@@ -175,10 +175,27 @@ async def settings_bot_texts_callback(callback: types.CallbackQuery):
     if not _is_admin(callback.from_user.id):
         return
     await callback.answer()
+
+    short_desc = "Не задано"
+    try:
+        short_desc_obj = await callback.bot.get_my_short_description()
+        if short_desc_obj and short_desc_obj.short_description:
+            short_desc = short_desc_obj.short_description
+    except Exception:
+        short_desc = _get_current_bot_text("bot_description")
+
+    desc = "Не задано"
+    try:
+        desc_obj = await callback.bot.get_my_description()
+        if desc_obj and desc_obj.description:
+            desc = desc_obj.description
+    except Exception:
+        desc = _get_current_bot_text("bot_about_text")
+
     await callback.message.edit_text(
         "🤖 <b>Тексты бота</b>\n\n"
-        f"Описание профиля: <b>{_get_current_bot_text('bot_description')}</b>\n\n"
-        f"Текст пустого чата: <b>{_get_current_bot_text('bot_about_text')}</b>\n\n"
+        f"Описание профиля: <b>{short_desc}</b>\n\n"
+        f"Текст пустого чата: <b>{desc}</b>\n\n"
         "Здесь можно настроить текст профиля бота и краткий текст для пустого чата.",
         parse_mode="HTML",
         reply_markup=keyboards.get_bot_texts_keyboard(),
@@ -192,7 +209,7 @@ async def edit_bot_description_callback(callback: types.CallbackQuery, state: FS
     await state.set_state(EditBotProfileTextForm.description)
     await callback.message.answer(
         "Введите новое <b>описание профиля</b> бота.\n\n"
-        "Этот текст показывается в пустом чате с ботом.\n"
+        "Этот краткий текст показывается в профиле бота и в шапке.\n"
         "Чтобы очистить описание, отправьте <code>-</code>.",
         parse_mode="HTML",
         reply_markup=keyboards.get_cancel_admin_action_keyboard("back_to_settings", "← Назад в настройки"),
@@ -207,7 +224,7 @@ async def edit_bot_about_callback(callback: types.CallbackQuery, state: FSMConte
     await state.set_state(EditBotProfileTextForm.about)
     await callback.message.answer(
         "Введите новый <b>текст пустого чата</b>.\n\n"
-        "Этот краткий текст показывается в профиле бота и в шапке.\n"
+        "Этот текст показывается в пустом чате с ботом.\n"
         "Чтобы очистить текст, отправьте <code>-</code>.",
         parse_mode="HTML",
         reply_markup=keyboards.get_cancel_admin_action_keyboard("back_to_settings", "← Назад в настройки"),
