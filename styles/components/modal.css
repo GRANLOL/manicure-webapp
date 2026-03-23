@@ -93,11 +93,7 @@
     word-break: break-word;
 }
 
-.modal-summary #modal-phone {
-    white-space: nowrap;
-    overflow-wrap: normal;
-    word-break: normal;
-}
+
 
 .modal-summary .summary-label {
     color: var(--text-muted);
