@@ -40,15 +40,27 @@ async def edit_menu_btn_portfolio_cb(callback: types.CallbackQuery):
     await callback.answer()
     lbl = salon_config.get("custom_btn_portfolio_lbl", "💅 Примеры работ")
     current_type = salon_config.get("custom_btn_portfolio_type", "portfolio")
+    enabled = salon_config.get("custom_btn_portfolio_enabled", True)
     text = (
         f"Управление кнопкой: <b>{lbl}</b>\n\n"
+        f"Статус: <b>{'🟢 Включена (видна клиентам)' if enabled else '🔴 Отключена (скрыта)'}</b>\n"
         f"Текущий режим работы: <b>{'Галерея (фото)' if current_type == 'portfolio' else 'Текст (ссылки/контакты)'}</b>"
     )
     await callback.message.edit_text(
         text,
         parse_mode="HTML",
-        reply_markup=get_menu_button_edit_keyboard("portfolio", current_type)
+        reply_markup=get_menu_button_edit_keyboard("portfolio", current_type, enabled)
     )
+
+@router.callback_query(F.data == "toggle_portfolio_btn_visibility")
+async def toggle_portfolio_btn_visibility_cb(callback: types.CallbackQuery):
+    if not _is_admin(callback.from_user.id):
+        return
+    current_enabled = salon_config.get("custom_btn_portfolio_enabled", True)
+    new_enabled = not current_enabled
+    update_config("custom_btn_portfolio_enabled", new_enabled)
+    await callback.answer(f"Кнопка {'включена' if new_enabled else 'отключена'}")
+    await edit_menu_btn_portfolio_cb(callback)
 
 
 @router.callback_query(F.data.startswith("edit_btn_lbl_"))
@@ -154,12 +166,14 @@ async def toggle_btn_type_cb(callback: types.CallbackQuery):
     update_config("custom_btn_portfolio_type", new_type)
     await callback.answer("Тип кнопки изменен")
     
+    enabled = salon_config.get("custom_btn_portfolio_enabled", True)
     lbl = salon_config.get("custom_btn_portfolio_lbl", "💅 Примеры работ")
     text = (
         f"Управление кнопкой: <b>{lbl}</b>\n\n"
+        f"Статус: <b>{'🟢 Включена (видна клиентам)' if enabled else '🔴 Отключена (скрыта)'}</b>\n"
         f"Текущий режим работы: <b>{'Галерея (фото)' if new_type == 'portfolio' else 'Текст (ссылки/контакты)'}</b>"
     )
-    await callback.message.edit_text(text, parse_mode="HTML", reply_markup=get_menu_button_edit_keyboard("portfolio", new_type))
+    await callback.message.edit_text(text, parse_mode="HTML", reply_markup=get_menu_button_edit_keyboard("portfolio", new_type, enabled))
 
 
 @router.callback_query(F.data == "edit_portfolio_gallery")

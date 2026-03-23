@@ -108,7 +108,7 @@ def get_menu_buttons_keyboard():
     return builder.as_markup()
 
 
-def get_menu_button_edit_keyboard(btn_id: str, current_type: str = "portfolio"):
+def get_menu_button_edit_keyboard(btn_id: str, current_type: str = "portfolio", enabled: bool = True):
     from aiogram.utils.keyboard import InlineKeyboardBuilder
 
     builder = InlineKeyboardBuilder()
@@ -121,6 +121,9 @@ def get_menu_button_edit_keyboard(btn_id: str, current_type: str = "portfolio"):
         else:
             builder.row(InlineKeyboardButton(text="✏️ Изменить текст", callback_data=f"edit_btn_txt_{btn_id}"))
             builder.row(InlineKeyboardButton(text="🔄 Сделать кнопкой-галереей", callback_data="toggle_btn_type_portfolio"))
+            
+        toggle_text = "🟢 Отключить кнопку" if enabled else "🔴 Включить кнопку"
+        builder.row(InlineKeyboardButton(text=toggle_text, callback_data="toggle_portfolio_btn_visibility"))
     else:
         builder.row(InlineKeyboardButton(text="✏️ Изменить текст", callback_data=f"edit_btn_txt_{btn_id}"))
 
