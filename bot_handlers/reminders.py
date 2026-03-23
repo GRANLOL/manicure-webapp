@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from .base import F, Router, database, getenv, types
+from .base import F, Router, database, escape, getenv, types
 
 router = Router()
 
@@ -21,9 +21,14 @@ async def reminder_confirm_cb(callback: types.CallbackQuery):
 
     admin_id = getenv("ADMIN_ID")
     if admin_id:
-        msg = f"Клиент {booking[0]} подтвердил запись на {booking[2]} в {booking[3]}."
+        msg = (
+            "✅ <b>Запись подтверждена</b>\n\n"
+            f"👤 <b>Клиент:</b> {escape(booking[0])}\n"
+            f"📅 <b>Дата:</b> {booking[2]}\n"
+            f"⏰ <b>Время:</b> {booking[3]}"
+        )
         try:
-            await callback.bot.send_message(admin_id, msg)
+            await callback.bot.send_message(admin_id, msg, parse_mode="HTML")
         except Exception:
             pass
 
@@ -45,9 +50,15 @@ async def reminder_cancel_cb(callback: types.CallbackQuery):
 
     admin_id = getenv("ADMIN_ID")
     if admin_id:
-        msg = f"Клиент {booking[0]} отменил запись на {booking[2]} в {booking[3]} через напоминание."
+        msg = (
+            "❌ <b>Запись отменена</b>\n\n"
+            f"👤 <b>Клиент:</b> {escape(booking[0])}\n"
+            f"📅 <b>Дата:</b> {booking[2]}\n"
+            f"⏰ <b>Время:</b> {booking[3]}\n"
+            "<i>Отменено через кнопку в напоминании.</i>"
+        )
         try:
-            await callback.bot.send_message(admin_id, msg)
+            await callback.bot.send_message(admin_id, msg, parse_mode="HTML")
         except Exception:
             pass
 
@@ -69,8 +80,14 @@ async def reminder_resched_cb(callback: types.CallbackQuery):
 
     admin_id = getenv("ADMIN_ID")
     if admin_id:
-        msg = f"Клиент {booking[0]} отменил запись на {booking[2]} в {booking[3]} и собирается выбрать новое время."
+        msg = (
+            "🔄 <b>Перенос записи</b>\n\n"
+            f"👤 <b>Клиент:</b> {escape(booking[0])}\n"
+            f"📅 <b>Старая дата:</b> {booking[2]}\n"
+            f"⏰ <b>Старое время:</b> {booking[3]}\n"
+            "<i>Клиент отменил эту запись и выбирает новое окно.</i>"
+        )
         try:
-            await callback.bot.send_message(admin_id, msg)
+            await callback.bot.send_message(admin_id, msg, parse_mode="HTML")
         except Exception:
             pass
