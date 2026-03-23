@@ -9,7 +9,7 @@ def get_main_menu(is_admin: bool = False):
     keyboard = [
         [KeyboardButton(text="📅 Онлайн-запись")],
         [KeyboardButton(text="💎 Услуги и цены"), KeyboardButton(text=portfolio_btn_text)],
-        [KeyboardButton(text=address_btn_text), KeyboardButton(text="🗓 Мои визиты")],
+        [KeyboardButton(text=address_btn_text), KeyboardButton(text="🗓 Актуальные записи")],
         [KeyboardButton(text="🕰 История записей")],
     ]
     if is_admin:

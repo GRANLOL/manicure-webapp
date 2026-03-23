@@ -127,20 +127,21 @@ def format_user_booking_text(name: str, phone: str, date: str, time: str, status
     safe_time = escape(time)
     safe_status = escape(get_booking_status_label(status))
     return (
-        "📌 <b>Ваша запись</b>\n\n"
-        f"<b>Статус:</b> {safe_status}\n"
-        f"<b>Имя / услуга:</b> {safe_name}\n"
-        f"<b>Дата:</b> {safe_date}\n"
-        f"<b>Время:</b> {safe_time}\n"
-        f"<b>Телефон:</b> {safe_phone}"
+        "🗓 <b>Актуальная запись</b>\n\n"
+        f"🏷 <b>Статус:</b> {safe_status}\n"
+        f"👤 <b>Запись:</b> {safe_name}\n"
+        f"📅 <b>Дата:</b> {safe_date}\n"
+        f"⏰ <b>Время:</b> {safe_time}\n"
+        f"📞 <b>Телефон:</b> {safe_phone}"
     )
 
 
 def format_booking_history_text(bookings: list[tuple[str, str, str, str, str]]) -> str:
     lines = [
-        "🕘 <b>История</b>",
+        "🕰 <b>История записей</b>",
         "",
-        "Последние завершённые и отменённые записи:",
+        "<i>Ваши прошедшие и отменённые визиты:</i>",
+        "━━━━━━━━━━━━━━━━━━",
         "",
     ]
 
@@ -152,10 +153,10 @@ def format_booking_history_text(bookings: list[tuple[str, str, str, str, str]]) 
         safe_status = escape(get_booking_status_label(status))
         lines.extend(
             [
-                f"<b>{index}. {safe_name}</b>",
-                f"Статус: {safe_status}",
-                f"Дата: {safe_date} в {safe_time}",
-                f"Телефон: {safe_phone}",
+                f"🔹 <b>{index}. {safe_name}</b>",
+                f"   🏷 <b>Статус:</b> {safe_status}",
+                f"   📅 <b>Дата:</b> {safe_date} в {safe_time}",
+                f"   📞 <b>Телефон:</b> {safe_phone}",
                 "",
             ]
         )

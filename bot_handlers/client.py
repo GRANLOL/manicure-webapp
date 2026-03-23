@@ -342,7 +342,7 @@ async def process_web_app_data(message: types.Message, state: FSMContext):
         await message.answer("⚠️ Произошла ошибка при обработке данных. Попробуйте еще раз.")
 
 
-@router.message(F.text.in_({"📋 Мои записи", "🗓 Мои визиты"}))
+@router.message(F.text.in_({"📋 Мои записи", "🗓 Актуальные записи"}))
 async def my_bookings_handler(message: types.Message):
     await database.sync_completed_bookings()
     bookings = await database.get_user_bookings(message.from_user.id)
