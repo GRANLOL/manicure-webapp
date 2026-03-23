@@ -107,6 +107,21 @@ async def process_btn_txt(message: types.Message, state: FSMContext):
     if btn_id == "address" and msg_text == "-":
          update_config("custom_btn_address_txt", "")
     else:
+         try:
+             # Validate HTML by sending a test message and immediately deleting it
+             tmp = await message.answer(f"<i>Превью текста:</i>\n\n{msg_text}", parse_mode="HTML", disable_web_page_preview=True)
+             try:
+                 await tmp.delete()
+             except Exception:
+                 pass
+         except Exception:
+             await message.answer(
+                 "⚠️ <b>Ошибка HTML-разметки!</b>\n\nУбедитесь, что вы закрыли все теги (например, <code>&lt;b&gt;текст&lt;/b&gt;</code>).\nПопробуйте написать текст еще раз.",
+                 parse_mode="HTML",
+                 reply_markup=keyboards.get_cancel_admin_action_keyboard("settings_menu_btns", "← Назад")
+             )
+             return
+             
          update_config(f"custom_btn_{btn_id}_txt", msg_text)
          
     await state.clear()
