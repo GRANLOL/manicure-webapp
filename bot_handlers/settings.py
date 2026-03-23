@@ -163,8 +163,8 @@ async def settings_reminders_callback(callback: types.CallbackQuery):
         return
     await callback.answer()
     
-    default_rem1 = "Здравствуйте, {name}! Напоминаем о вашей записи завтра ({date}) в {time}."
-    default_rem2 = "Здравствуйте, {name}! Напоминаем, ваша запись состоится сегодня ({date}) в {time}."
+    default_rem1 = "🔔 <b>Здравствуйте, {name}!</b>\n\nНапоминаем, что вы записаны к нам на завтра <b>({date})</b> в <b>{time}</b>.\nЖдем вас! ✨"
+    default_rem2 = "⏰ <b>Здравствуйте, {name}!</b>\n\nНапоминаем, что ваша запись состоится уже сегодня <b>({date})</b> в <b>{time}</b>.\nДо скорой встречи! 👋"
     
     rem1 = salon_config.get("reminder_1_text", "")
     rem2 = salon_config.get("reminder_2_text", "")
@@ -300,7 +300,7 @@ async def process_bot_about_text(message: types.Message, state: FSMContext):
 async def edit_rem_text_1_cb(callback: types.CallbackQuery, state: FSMContext):
     await state.set_state(EditReminderSettingsForm.text_1)
     current = salon_config.get("reminder_1_text", "")
-    default_text = "Здравствуйте, {name}! Напоминаем о вашей записи завтра ({date}) в {time}."
+    default_text = "🔔 <b>Здравствуйте, {name}!</b>\n\nНапоминаем, что вы записаны к нам на завтра <b>({date})</b> в <b>{time}</b>.\nЖдем вас! ✨"
     current_display = f"\n\nТекущий текст:\n<blockquote>{current}</blockquote>" if current else f"\n\nТекст по умолчанию:\n<blockquote>{default_text}</blockquote>"
     await callback.message.answer(
         "Введите новый текст для <b>первого напоминания</b>."
@@ -316,7 +316,7 @@ async def edit_rem_text_1_cb(callback: types.CallbackQuery, state: FSMContext):
 async def edit_rem_text_2_cb(callback: types.CallbackQuery, state: FSMContext):
     await state.set_state(EditReminderSettingsForm.text_2)
     current = salon_config.get("reminder_2_text", "")
-    default_text = "Здравствуйте, {name}! Напоминаем, ваша запись состоится сегодня ({date}) в {time}."
+    default_text = "⏰ <b>Здравствуйте, {name}!</b>\n\nНапоминаем, что ваша запись состоится уже сегодня <b>({date})</b> в <b>{time}</b>.\nДо скорой встречи! 👋"
     current_display = f"\n\nТекущий текст:\n<blockquote>{current}</blockquote>" if current else f"\n\nТекст по умолчанию:\n<blockquote>{default_text}</blockquote>"
     await callback.message.answer(
         "Введите новый текст для <b>второго напоминания</b>."

@@ -58,7 +58,7 @@ async def check_reminders(bot: Bot):
                 continue
             template_1 = salon_config.get(
                 "reminder_1_text",
-                "Здравствуйте, {name}! Напоминаем о вашей записи завтра ({date}) в {time}.",
+                "🔔 <b>Здравствуйте, {name}!</b>\n\nНапоминаем, что вы записаны к нам на завтра <b>({date})</b> в <b>{time}</b>.\nЖдем вас! ✨",
             )
             msg = format_reminder(template_1, name, date_str, time_str)
             try:
@@ -75,7 +75,7 @@ async def check_reminders(bot: Bot):
                 continue
             template_2 = salon_config.get(
                 "reminder_2_text",
-                "Здравствуйте, {name}! Напоминаем, ваша запись состоится сегодня ({date}) в {time}.",
+                "⏰ <b>Здравствуйте, {name}!</b>\n\nНапоминаем, что ваша запись состоится уже сегодня <b>({date})</b> в <b>{time}</b>.\nДо скорой встречи! 👋",
             )
             msg = format_reminder(template_2, name, date_str, time_str)
             try:
