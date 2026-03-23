@@ -206,8 +206,16 @@ async def price_page_cb(callback: types.CallbackQuery):
     )
 
 
-@router.message(F.text == "📌 Адрес")
+def is_address_btn(message: types.Message) -> bool:
+    return message.text == salon_config.get("custom_btn_address_lbl", "📌 Адрес")
+
+@router.message(is_address_btn)
 async def handle_address(message: types.Message):
+    custom_txt = salon_config.get("custom_btn_address_txt")
+    if custom_txt:
+        await message.answer(custom_txt, parse_mode="HTML", disable_web_page_preview=False)
+        return
+
     address = salon_config.get("address", "Адрес не указан.")
     hours = salon_config.get("working_hours", "")
     map_url = salon_config.get("map_url", "")
@@ -221,8 +229,19 @@ async def handle_address(message: types.Message):
     await message.answer(text, parse_mode="HTML", disable_web_page_preview=False)
 
 
-@router.message(F.text == "🖼 Примеры работ")
+def is_portfolio_btn(message: types.Message) -> bool:
+    return message.text == salon_config.get("custom_btn_portfolio_lbl", "🖼 Примеры работ")
+
+@router.message(is_portfolio_btn)
 async def handle_portfolio(message: types.Message):
+    btn_type = salon_config.get("custom_btn_portfolio_type", "portfolio")
+    lbl = salon_config.get("custom_btn_portfolio_lbl", "🖼 Примеры работ")
+    
+    if btn_type == "text":
+        custom_txt = salon_config.get("custom_btn_portfolio_txt") or "Текст не настроен."
+        await message.answer(custom_txt, parse_mode="HTML", disable_web_page_preview=False)
+        return
+
     portfolio_url = salon_config.get("portfolio_url", "")
     portfolio_items = _get_portfolio_items()
 
@@ -232,12 +251,11 @@ async def handle_portfolio(message: types.Message):
             item_caption = escape(item["caption"])
             if index == 0:
                 lines = [
-                    "🖼 <b>Примеры работ</b>",
+                    f"<b>{escape(lbl)}</b>",
                     "",
-                    "Ниже собрал несколько работ прямо в чате.",
                 ]
                 if item_caption:
-                    lines.extend(["", item_caption])
+                    lines.extend([item_caption])
                 if portfolio_url:
                     lines.extend(["", "Полную галерею можно открыть по кнопке ниже."])
                 caption = "\n".join(lines)
@@ -266,9 +284,9 @@ async def handle_portfolio(message: types.Message):
     if portfolio_url:
         await message.answer(
             (
-                "🖼 <b>Примеры работ</b>\n\n"
-                "Сейчас полная подборка открывается отдельной галереей.\n"
-                "Нажмите кнопку ниже, чтобы посмотреть все работы."
+                f"<b>{escape(lbl)}</b>\n\n"
+                "Сейчас полная подборка открывается отдельной ссылкой.\n"
+                "Нажмите кнопку ниже, чтобы посмотреть."
             ),
             parse_mode="HTML",
             disable_web_page_preview=True,
@@ -278,7 +296,7 @@ async def handle_portfolio(message: types.Message):
 
     await message.answer(
         (
-            "🖼 <b>Примеры работ</b>\n\n"
+            f"<b>{escape(lbl)}</b>\n\n"
             "Галерея пока не добавлена.\n"
             "Чуть позже здесь появятся фотографии с подписями."
         ),

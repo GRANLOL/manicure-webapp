@@ -51,6 +51,7 @@ def get_system_settings_keyboard():
 
     builder = InlineKeyboardBuilder()
     duration_enabled = bool(salon_config.get("show_service_duration", True))
+    builder.row(InlineKeyboardButton(text="📱 Кнопки меню", callback_data="settings_menu_btns"))
     builder.row(InlineKeyboardButton(text="🔔 Настройки напоминаний", callback_data="settings_reminders"))
     builder.row(InlineKeyboardButton(text="🤖 Тексты бота", callback_data="settings_bot_texts"))
     builder.row(InlineKeyboardButton(text="🕒 Часовой пояс (UTC)", callback_data="settings_timezone"))
@@ -92,6 +93,51 @@ def get_bot_texts_keyboard():
     builder.row(InlineKeyboardButton(text="📝 Описание профиля", callback_data="edit_bot_description"))
     builder.row(InlineKeyboardButton(text="💬 Текст пустого чата", callback_data="edit_bot_about"))
     builder.row(InlineKeyboardButton(text="← Назад в настройки", callback_data="back_to_settings"))
+    builder.row(InlineKeyboardButton(text="❌ Отмена", callback_data="cancel_admin_action"))
+    return builder.as_markup()
+
+
+def get_menu_buttons_keyboard():
+    from aiogram.utils.keyboard import InlineKeyboardBuilder
+
+    builder = InlineKeyboardBuilder()
+    builder.row(InlineKeyboardButton(text="📌 Настроить левую кнопку (Адрес)", callback_data="edit_menu_btn_address"))
+    builder.row(InlineKeyboardButton(text="🖼 Настроить правую кнопку (Галерея/Контакты)", callback_data="edit_menu_btn_portfolio"))
+    builder.row(InlineKeyboardButton(text="← Назад в настройки", callback_data="back_to_settings"))
+    builder.row(InlineKeyboardButton(text="❌ Отмена", callback_data="cancel_admin_action"))
+    return builder.as_markup()
+
+
+def get_menu_button_edit_keyboard(btn_id: str, current_type: str = "portfolio"):
+    from aiogram.utils.keyboard import InlineKeyboardBuilder
+
+    builder = InlineKeyboardBuilder()
+    builder.row(InlineKeyboardButton(text="✏️ Изменить название кнопки", callback_data=f"edit_btn_lbl_{btn_id}"))
+    
+    if btn_id == "portfolio":
+        if current_type == "portfolio":
+            builder.row(InlineKeyboardButton(text="🖼 Управление галереей", callback_data="edit_portfolio_gallery"))
+            builder.row(InlineKeyboardButton(text="🔄 Сделать кнопкой с текстом", callback_data="toggle_btn_type_text"))
+        else:
+            builder.row(InlineKeyboardButton(text="✏️ Изменить текст", callback_data=f"edit_btn_txt_{btn_id}"))
+            builder.row(InlineKeyboardButton(text="🔄 Сделать кнопкой-галереей", callback_data="toggle_btn_type_portfolio"))
+    else:
+        builder.row(InlineKeyboardButton(text="✏️ Изменить текст", callback_data=f"edit_btn_txt_{btn_id}"))
+
+    builder.row(InlineKeyboardButton(text="← К выбору кнопок", callback_data="settings_menu_btns"))
+    builder.row(InlineKeyboardButton(text="❌ Отмена", callback_data="cancel_admin_action"))
+    return builder.as_markup()
+
+
+def get_portfolio_editor_keyboard(items_count: int):
+    from aiogram.utils.keyboard import InlineKeyboardBuilder
+
+    builder = InlineKeyboardBuilder()
+    builder.row(InlineKeyboardButton(text="📸 Загрузить фото", callback_data="portfolio_add_photo"))
+    builder.row(InlineKeyboardButton(text="🔗 Изменить ссылку (Вся галерея)", callback_data="portfolio_edit_url"))
+    if items_count > 0:
+        builder.row(InlineKeyboardButton(text="🗑 Очистить галерею", callback_data="portfolio_clear"))
+    builder.row(InlineKeyboardButton(text="← Назад", callback_data="edit_menu_btn_portfolio"))
     builder.row(InlineKeyboardButton(text="❌ Отмена", callback_data="cancel_admin_action"))
     return builder.as_markup()
 

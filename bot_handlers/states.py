@@ -110,3 +110,14 @@ class RescheduleBookingForm(StatesGroup):
 
 class SearchBookingForm(StatesGroup):
     query = State()
+
+
+class EditMenuButtonForm(StatesGroup):
+    target_btn = State()
+    label = State()
+    text = State()
+
+
+class EditPortfolioGalleryForm(StatesGroup):
+    portfolio_url = State()
+    photo_upload = State()
