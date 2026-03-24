@@ -1,8 +1,8 @@
-import { tg } from '../telegram.js?v=15';
-import { store } from '../store.js?v=15';
-import { config } from '../config.js?v=15';
-import { getFormIssues } from './form.js?v=15';
-import { showToast } from './toast.js?v=15';
+import { tg } from '../telegram.js';
+import { store } from '../store.js';
+import { config } from '../config.js';
+import { getFormIssues } from './form.js';
+import { showToast } from './toast.js';
 
 const SAVED_PHONE_KEY = 'savedBookingPhone';
 

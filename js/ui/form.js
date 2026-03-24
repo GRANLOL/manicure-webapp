@@ -1,7 +1,7 @@
-import { tg } from '../telegram.js?v=15';
-import { store } from '../store.js?v=15';
-import { showModal } from './modal.js?v=15';
-import { showToast } from './toast.js?v=15';
+import { tg } from '../telegram.js';
+import { store } from '../store.js';
+import { showModal } from './modal.js';
+import { showToast } from './toast.js';
 
 const bookingButton = document.getElementById('booking-submit-btn');
 
