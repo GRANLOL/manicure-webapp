@@ -124,6 +124,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         await fetchContent();
         await fetchBusySlots();
 
+        applyHeaderBranding();
+
         // Initial Render
         populateServices();
         generateDates();

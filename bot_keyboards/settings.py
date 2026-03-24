@@ -52,6 +52,7 @@ def get_system_settings_keyboard():
     builder = InlineKeyboardBuilder()
     duration_enabled = bool(salon_config.get("show_service_duration", True))
     builder.row(InlineKeyboardButton(text="📱 Кнопки меню", callback_data="settings_menu_btns"))
+    builder.row(InlineKeyboardButton(text="🖼 Шапка WebApp", callback_data="settings_webapp_header"))
     builder.row(InlineKeyboardButton(text="🔔 Настройки напоминаний", callback_data="settings_reminders"))
     builder.row(InlineKeyboardButton(text="🤖 Тексты бота", callback_data="settings_bot_texts"))
     builder.row(InlineKeyboardButton(text="🕒 Часовой пояс (UTC)", callback_data="settings_timezone"))
@@ -71,6 +72,19 @@ def get_system_settings_keyboard():
         )
     )
     builder.row(InlineKeyboardButton(text="⬅️ Назад в меню", callback_data="back_to_admin_menu"))
+    return builder.as_markup()
+
+
+def get_webapp_header_keyboard():
+    from aiogram.utils.keyboard import InlineKeyboardBuilder
+
+    builder = InlineKeyboardBuilder()
+    builder.row(InlineKeyboardButton(text="✏️ Изменить название", callback_data="webapp_edit_name"))
+    builder.row(InlineKeyboardButton(text="✏️ Изменить слоган", callback_data="webapp_edit_tagline"))
+    builder.row(InlineKeyboardButton(text="🔄 Режим логотипа", callback_data="webapp_toggle_logo_type"))
+    builder.row(InlineKeyboardButton(text="🖼 Настроить логотип", callback_data="webapp_edit_logo_data"))
+    builder.row(InlineKeyboardButton(text="← Назад в настройки", callback_data="back_to_settings"))
+    builder.row(InlineKeyboardButton(text="❌ Отмена", callback_data="cancel_admin_action"))
     return builder.as_markup()
 
 

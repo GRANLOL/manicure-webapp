@@ -86,6 +86,12 @@ async def get_content(x_telegram_init_data: str | None = Header(default=None)) -
     show_service_duration = bool(salon_config.get("show_service_duration", True))
     currency_symbol = salon_config.get("currency_symbol", "₸")
 
+    webapp_salon_name = salon_config.get("webapp_salon_name", "Nail Studio Deluxe")
+    webapp_salon_tagline = salon_config.get("webapp_salon_tagline", "online booking")
+    webapp_logo_type = salon_config.get("webapp_logo_type", "url")
+    webapp_logo_url = salon_config.get("webapp_logo_url", "https://granlol.github.io/manicure-webapp/assets/logos/testlogo.png")
+    webapp_logo_text = salon_config.get("webapp_logo_text", "")
+
     return {
         "services": services,
         "categories": categories,
@@ -97,6 +103,11 @@ async def get_content(x_telegram_init_data: str | None = Header(default=None)) -
         "timezone_offset": timezone_offset,
         "currency_symbol": currency_symbol,
         "show_service_duration": show_service_duration,
+        "webapp_salon_name": webapp_salon_name,
+        "webapp_salon_tagline": webapp_salon_tagline,
+        "webapp_logo_type": webapp_logo_type,
+        "webapp_logo_url": webapp_logo_url,
+        "webapp_logo_text": webapp_logo_text,
     }
 
 

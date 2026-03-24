@@ -121,3 +121,10 @@ class EditMenuButtonForm(StatesGroup):
 class EditPortfolioGalleryForm(StatesGroup):
     portfolio_url = State()
     photo_upload = State()
+
+
+class EditWebAppHeaderForm(StatesGroup):
+    name = State()
+    tagline = State()
+    logo_text = State()
+    logo_url = State()

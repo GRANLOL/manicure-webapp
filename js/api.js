@@ -75,6 +75,24 @@ export async function fetchContent() {
             if (data.show_service_duration !== undefined) {
                 store.showServiceDuration = Boolean(data.show_service_duration);
             }
+            if (data.webapp_salon_name !== undefined) {
+                config.salonName = data.webapp_salon_name;
+            }
+            if (data.webapp_salon_tagline !== undefined) {
+                config.salonTagline = data.webapp_salon_tagline;
+            }
+            if (data.webapp_logo_type !== undefined) {
+                if (data.webapp_logo_type === "none") {
+                    config.salonLogoUrl = "";
+                    config.salonLogoText = "";
+                } else if (data.webapp_logo_type === "text") {
+                    config.salonLogoUrl = "";
+                    config.salonLogoText = data.webapp_logo_text || "";
+                } else if (data.webapp_logo_type === "url") {
+                    config.salonLogoUrl = data.webapp_logo_url || "";
+                    config.salonLogoText = "";
+                }
+            }
         }
     } catch (e) {
         console.error("Error fetching available content:", e);

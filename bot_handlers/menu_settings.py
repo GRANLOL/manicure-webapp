@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from bot_handlers.base import F, FSMContext, Router, keyboards, salon_config, update_config, types
 from bot_handlers.settings import _is_admin
-from bot_keyboards.settings import get_menu_buttons_keyboard, get_menu_button_edit_keyboard, get_portfolio_editor_keyboard
-from bot_handlers.states import EditMenuButtonForm, EditPortfolioGalleryForm
+from bot_keyboards.settings import get_menu_buttons_keyboard, get_menu_button_edit_keyboard, get_portfolio_editor_keyboard, get_webapp_header_keyboard
+from bot_handlers.states import EditMenuButtonForm, EditPortfolioGalleryForm, EditWebAppHeaderForm
 
 router = Router()
 
@@ -275,3 +275,145 @@ async def portfolio_clear_cb(callback: types.CallbackQuery):
     except Exception:
         pass
     await edit_portfolio_gallery_cb(callback)
+
+@router.callback_query(F.data == "settings_webapp_header")
+async def settings_webapp_header_cb(callback: types.CallbackQuery, state: FSMContext):
+    if not _is_admin(callback.from_user.id):
+        return
+    await callback.answer()
+    await state.clear()
+    
+    name = salon_config.get("webapp_salon_name", "Nail Studio Deluxe")
+    tagline = salon_config.get("webapp_salon_tagline", "online booking")
+    logo_type = salon_config.get("webapp_logo_type", "url")
+    
+    mode_text = "Картинка (URL/Путь)"
+    if logo_type == "text":
+        mode_text = "Монограмма (Текст)"
+    elif logo_type == "none":
+        mode_text = "Без логотипа"
+        
+    text = (
+        "🖼 <b>Настройки шапки WebApp</b>\n\n"
+        f"<b>Название:</b> {name}\n"
+        f"<b>Слоган:</b> {tagline if tagline else '<i>(не задан)</i>'}\n"
+        f"<b>Режим логотипа:</b> {mode_text}\n"
+    )
+    
+    await callback.message.edit_text(
+        text,
+        parse_mode="HTML",
+        reply_markup=get_webapp_header_keyboard()
+    )
+
+
+@router.callback_query(F.data == "webapp_edit_name")
+async def webapp_edit_name_cb(callback: types.CallbackQuery, state: FSMContext):
+    if not _is_admin(callback.from_user.id): return
+    await state.set_state(EditWebAppHeaderForm.name)
+    await callback.message.edit_text(
+        "📝 Введите новое название (для шапки сайта):",
+        reply_markup=keyboards.get_cancel_admin_action_keyboard("settings_webapp_header", "← Назад")
+    )
+    await callback.answer()
+
+
+@router.message(EditWebAppHeaderForm.name)
+async def process_webapp_name(message: types.Message, state: FSMContext):
+    update_config("webapp_salon_name", message.text.strip())
+    await state.clear()
+    await message.answer("✅ Название обновлено!", reply_markup=keyboards.get_cancel_admin_action_keyboard("settings_webapp_header", "◀️ В меню шапки"))
+
+
+@router.callback_query(F.data == "webapp_edit_tagline")
+async def webapp_edit_tagline_cb(callback: types.CallbackQuery, state: FSMContext):
+    if not _is_admin(callback.from_user.id): return
+    await state.set_state(EditWebAppHeaderForm.tagline)
+    await callback.message.edit_text(
+        "📝 Введите новый слоган (отправьте `-` чтобы удалить слоган):",
+        reply_markup=keyboards.get_cancel_admin_action_keyboard("settings_webapp_header", "← Назад")
+    )
+    await callback.answer()
+
+
+@router.message(EditWebAppHeaderForm.tagline)
+async def process_webapp_tagline(message: types.Message, state: FSMContext):
+    text = message.text.strip()
+    if text == "-":
+        text = ""
+    update_config("webapp_salon_tagline", text)
+    await state.clear()
+    await message.answer("✅ Слоган обновлен!", reply_markup=keyboards.get_cancel_admin_action_keyboard("settings_webapp_header", "◀️ В меню шапки"))
+
+
+@router.callback_query(F.data == "webapp_toggle_logo_type")
+async def webapp_toggle_logo_type_cb(callback: types.CallbackQuery, state: FSMContext):
+    if not _is_admin(callback.from_user.id): return
+    
+    current_type = salon_config.get("webapp_logo_type", "url")
+    types_chain = ["url", "text", "none"]
+    next_type = types_chain[(types_chain.index(current_type) + 1) % len(types_chain)]
+    
+    update_config("webapp_logo_type", next_type)
+    mode_text = {
+        "url": "Картинка (URL/Путь)",
+        "text": "Монограмма (Текст)",
+        "none": "Без логотипа"
+    }[next_type]
+    
+    await callback.answer(f"Новый режим: {mode_text}")
+    await settings_webapp_header_cb(callback, state)
+
+
+@router.callback_query(F.data == "webapp_edit_logo_data")
+async def webapp_edit_logo_data_cb(callback: types.CallbackQuery, state: FSMContext):
+    if not _is_admin(callback.from_user.id): return
+    
+    logo_type = salon_config.get("webapp_logo_type", "url")
+    if logo_type == "none":
+        await callback.answer("Текущий режим: Без логотипа. Сначала измените режим.", show_alert=True)
+        return
+        
+    await state.set_state(EditWebAppHeaderForm.logo_url if logo_type == "url" else EditWebAppHeaderForm.logo_text)
+    
+    if logo_type == "url":
+        prompt = (
+            "🖼 <b>Настройка картинки</b>\n\n"
+            "Отправьте прямую ссылку на картинку или относительный путь к картинке в репозитории (например, `assets/logos/testlogo.png`)\n\n"
+            "Отправьте `-` чтобы очистить."
+        )
+    else:
+        prompt = (
+            "🔠 <b>Настройка монограммы</b>\n\n"
+            "Введите 1-2 буквы для логотипа (например, `ND`):\n\n"
+            "Отправьте `-` чтобы очистить."
+        )
+        
+    await callback.message.edit_text(
+        prompt,
+        parse_mode="HTML",
+        reply_markup=keyboards.get_cancel_admin_action_keyboard("settings_webapp_header", "← Назад")
+    )
+    await callback.answer()
+
+
+@router.message(EditWebAppHeaderForm.logo_url)
+async def process_webapp_logo_url(message: types.Message, state: FSMContext):
+    text = message.text.strip()
+    if text == "-":
+        text = ""
+    update_config("webapp_logo_url", text)
+    await state.clear()
+    await message.answer("✅ Ссылка/путь на картинку обновлена!", reply_markup=keyboards.get_cancel_admin_action_keyboard("settings_webapp_header", "◀️ В меню шапки"))
+
+
+@router.message(EditWebAppHeaderForm.logo_text)
+async def process_webapp_logo_text(message: types.Message, state: FSMContext):
+    text = message.text.strip()
+    if text == "-":
+        text = ""
+    else:
+        text = text[:2].upper()
+    update_config("webapp_logo_text", text)
+    await state.clear()
+    await message.answer("✅ Текст монограммы обновлен!", reply_markup=keyboards.get_cancel_admin_action_keyboard("settings_webapp_header", "◀️ В меню шапки"))
