@@ -1,0 +1,21 @@
+{
+  "salon_name": "",
+  "address": "",
+  "map_url": "",
+  "portfolio_url": "",
+  "portfolio_items": [],
+  "timezone_offset": 3,
+  "reminder_grace_minutes": 30,
+  "working_hours": "ПН-ВС 10:00 - 20:00",
+  "booking_window": 14,
+  "max_active_bookings_per_user": 3,
+  "bot_description": "",
+  "bot_about_text": "",
+  "lunch_break_enabled": false,
+  "lunch_break_start": "13:00",
+  "lunch_break_end": "14:00",
+  "show_service_duration": true,
+  "webapp_auth_required": true,
+  "working_days": [1, 2, 3, 4, 5, 6, 0],
+  "blacklisted_dates": []
+}
