@@ -1,8 +1,8 @@
 {
-  "salon_name": "Nail Studio Deluxe",
-  "address": "г. Москва, ул. Арбат, д. 1, офис 10",
-  "map_url": "https://yandex.ru/maps/",
-  "portfolio_url": "https://t.me/your_portfolio_channel",
+  "salon_name": "Ваш Салон",
+  "address": "Адрес не указан",
+  "map_url": "",
+  "portfolio_url": "",
   "portfolio_items": [
     {
       "media": "https://placehold.co/1200x900/png?text=Example+Work+1",

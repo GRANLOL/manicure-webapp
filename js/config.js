@@ -50,10 +50,10 @@ function resolveApiBaseUrl() {
 
 export const config = {
     // Название заведения, которое отображается в шапке
-    salonName: "Nail Studio Deluxe",
+    salonName: "Ваш Салон",
     salonLogoUrl: "https://granlol.github.io/raymond-solutions/assets/logos/testlogo.png",
     salonLogoText: "",
-    salonTagline: "online booking",
+    salonTagline: "онлайн запись",
 
     apiBaseUrl: resolveApiBaseUrl(),
 
