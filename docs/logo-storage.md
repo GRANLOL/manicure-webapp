@@ -15,13 +15,13 @@ Recommended format:
 Example GitHub Pages URL:
 
 ```text
-https://granlol.github.io/manicure-webapp/assets/logos/client-name.png
+https://granlol.github.io/raymond-solutions/assets/logos/client-name.png
 ```
 
 Example config:
 
 ```js
-salonLogoUrl: "https://granlol.github.io/manicure-webapp/assets/logos/client-name.png",
+salonLogoUrl: "https://granlol.github.io/raymond-solutions/assets/logos/client-name.png",
 salonLogoText: "",
 salonTagline: "online booking",
 ```

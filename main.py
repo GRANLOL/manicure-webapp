@@ -89,7 +89,7 @@ async def get_content(x_telegram_init_data: str | None = Header(default=None)) -
     webapp_salon_name = salon_config.get("webapp_salon_name", "Nail Studio Deluxe")
     webapp_salon_tagline = salon_config.get("webapp_salon_tagline", "online booking")
     webapp_logo_type = salon_config.get("webapp_logo_type", "url")
-    webapp_logo_url = salon_config.get("webapp_logo_url", "https://granlol.github.io/manicure-webapp/assets/logos/testlogo.png")
+    webapp_logo_url = salon_config.get("webapp_logo_url", "https://granlol.github.io/raymond-solutions/assets/logos/testlogo.png")
     webapp_logo_text = salon_config.get("webapp_logo_text", "")
 
     return {

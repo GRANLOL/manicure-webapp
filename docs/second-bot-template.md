@@ -20,7 +20,7 @@
 
 ```bash
 cd /opt
-git clone https://github.com/GRANLOL/manicure-webapp.git client2
+git clone https://github.com/GRANLOL/raymond-solutions.git client2
 cd /opt/client2
 python3 -m venv .venv
 source .venv/bin/activate
@@ -138,7 +138,7 @@ certbot --nginx -d api2.tgbooking.online
 В `.env` файле второго бота в настройке `WEBAPP_URL` просто укажите ссылку на ваш текущий фронтенд, но добавьте параметр `?client=api2`:
 
 ```env
-WEBAPP_URL=https://granlol.github.io/manicure-webapp/?client=api2
+WEBAPP_URL=https://granlol.github.io/raymond-solutions/?client=api2
 ```
 Встроенная логика фронтенда сама прочитает `client=api2` и будет отправлять все запросы к `https://api2.tgbooking.online/api`.
 
