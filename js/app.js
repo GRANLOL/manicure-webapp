@@ -124,8 +124,20 @@ document.addEventListener('DOMContentLoaded', async () => {
         await fetchContent();
         
         if (store.hasConnectionError) {
-            document.getElementById('main-container').style.display = 'none';
-            document.getElementById('error-container').style.display = 'flex';
+            const mainEl = document.getElementById('main-container') || document.querySelector('.container');
+            const errEl = document.getElementById('error-container');
+            if (mainEl) mainEl.style.display = 'none';
+            if (errEl) {
+                errEl.style.display = 'flex';
+            } else {
+                // Fallback: inject error message directly into page if old HTML is cached
+                const wrapper = document.querySelector('.app-wrapper') || document.body;
+                const div = document.createElement('div');
+                div.className = 'error-container';
+                div.style.cssText = 'display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 20px;text-align:center;min-height:50vh;';
+                div.innerHTML = '<div style="font-size:48px;margin-bottom:16px">⚠️</div><h2 style="font-size:22px;font-weight:700;margin-bottom:12px">Сервис временно недоступен</h2><p style="font-size:14px;opacity:0.7;margin-bottom:32px">Не удалось подключиться к серверу.<br>Попробуйте зайти немного позже.</p><button onclick="window.location.reload()" style="background:linear-gradient(135deg,#c9a227,#e8cd6a);color:#000;border:none;padding:14px 28px;border-radius:12px;font-size:16px;font-weight:600;cursor:pointer">Обновить страницу</button>';
+                wrapper.appendChild(div);
+            }
             applyHeaderBranding();
             return;
         }
