@@ -123,13 +123,16 @@ systemctl reload nginx
 certbot --nginx -d api2.tgbooking.online
 ```
 
-## 7. Обновить фронт второго бота
+## 7. Настройка WebApp URL для второго бота (Фронтенд)
 
-Во фронте второго бота должен быть свой API:
+Вам **НЕ НУЖНО** копировать, менять код или отдельно деплоить фронтенд для второго бота. Фронтенд работает из одного места (GitHub Pages) для всех ботов.
 
-```js
-const REMOTE_API_BASE_URL = "https://api2.tgbooking.online/api";
+В `.env` файле второго бота в настройке `WEBAPP_URL` просто укажите ссылку на ваш текущий фронтенд, но добавьте параметр `?client=api2`:
+
+```env
+WEBAPP_URL=https://granlol.github.io/manicure-webapp/?client=api2
 ```
+Встроенная логика фронтенда сама прочитает `client=api2` и будет отправлять все запросы к `https://api2.tgbooking.online/api`.
 
 ## 8. Полезные команды
 
@@ -157,7 +160,7 @@ systemctl restart bookingbot-client2
 
 - `BOT_TOKEN`
 - `ADMIN_ID`
-- `WEBAPP_URL`
+- `WEBAPP_URL` (обязательно с параметром `?client=api2`)
 - `PORT`
 - `DATABASE_PATH`
 - `CONFIG_PATH`

@@ -13,8 +13,14 @@ function resolveApiBaseUrl() {
     const runtimeApiBaseUrl = window.__API_BASE_URL__;
     const isGitHubPages = window.location.hostname.endsWith("github.io");
 
+    const clientAlias = url.searchParams.get("client");
+
     if (resetOverride === "1") {
         window.localStorage.removeItem(API_OVERRIDE_KEY);
+    }
+
+    if (clientAlias) {
+        return `https://${clientAlias}.tgbooking.online/api`;
     }
 
     if (apiOverride) {
