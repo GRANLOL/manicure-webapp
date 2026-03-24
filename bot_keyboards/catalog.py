@@ -34,6 +34,8 @@ def get_services_keyboard(services, page: int = 0, page_size: int = 20):
         builder.row(*nav_buttons)
 
     builder.row(InlineKeyboardButton(text="➕ Добавить услугу", callback_data="add_service"))
+    if total > 0:
+        builder.row(InlineKeyboardButton(text="🗑 Удалить все услуги", callback_data="confirm_delete_all_services"))
     builder.row(InlineKeyboardButton(text="❌ Отмена", callback_data="cancel_admin_action"))
     return builder.as_markup()
 
@@ -82,6 +84,8 @@ def get_categories_keyboard(categories):
         builder.row(InlineKeyboardButton(text=f"✏️ {prefix}{name[:20]}", callback_data=f"edit_cat_{category_id}"))
     builder.row(InlineKeyboardButton(text="➕ Создать категорию", callback_data="add_category"))
     builder.row(InlineKeyboardButton(text="➕ Создать подкатегорию", callback_data="add_subcategory_existing"))
+    if tree:
+        builder.row(InlineKeyboardButton(text="🗑 Удалить все категории", callback_data="confirm_delete_all_categories"))
     builder.row(InlineKeyboardButton(text="❌ Отмена", callback_data="cancel_admin_action"))
     return builder.as_markup()
 
@@ -165,4 +169,20 @@ def get_free_services_keyboard(free_services, selected_ids):
 
     builder.row(InlineKeyboardButton(text="Завершить выбор", callback_data="finish_service_selection"))
     builder.row(InlineKeyboardButton(text="❌ Отмена", callback_data="cancel_admin_action"))
+    return builder.as_markup()
+
+
+def get_confirm_delete_all_services_keyboard():
+    from aiogram.utils.keyboard import InlineKeyboardBuilder
+    builder = InlineKeyboardBuilder()
+    builder.row(InlineKeyboardButton(text="Да, удалить ВСЕ услуги", callback_data="action_delete_all_services"))
+    builder.row(InlineKeyboardButton(text="Отмена", callback_data="back_to_services"))
+    return builder.as_markup()
+
+
+def get_confirm_delete_all_categories_keyboard():
+    from aiogram.utils.keyboard import InlineKeyboardBuilder
+    builder = InlineKeyboardBuilder()
+    builder.row(InlineKeyboardButton(text="Да, удалить ВСЕ категории", callback_data="action_delete_all_categories"))
+    builder.row(InlineKeyboardButton(text="Отмена", callback_data="back_to_categories"))
     return builder.as_markup()

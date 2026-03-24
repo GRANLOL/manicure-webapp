@@ -4,6 +4,8 @@ from money import get_currency_symbol
 
 from .base import F, Router, FSMContext, build_category_list_text, filter_valid_parent_categories, keyboards, database, escape, getenv, types
 from .states import AddServiceForm, AddSubcategoryExistingForm, CategoryWizard, EditCategoryForm, EditServiceForm, WizardAddServiceForm
+from repositories.services import delete_all_services
+from repositories.categories import delete_all_categories
 
 router = Router()
 
@@ -684,3 +686,58 @@ async def process_service_duration(message: types.Message, state: FSMContext):
 
     services = await database.get_all_services()
     await message.answer(f"✅ Услуга <b>{escape(name)}</b> добавлена.", parse_mode="HTML", reply_markup=keyboards.get_services_keyboard(services))
+
+
+@router.callback_query(F.data == "confirm_delete_all_services")
+async def confirm_delete_all_services_cb(callback: types.CallbackQuery):
+    admin_id = getenv("ADMIN_ID")
+    if not admin_id or str(callback.from_user.id) != admin_id:
+        return
+    await callback.message.edit_text(
+        "⚠️ Вы уверены, что хотите безвозвратно удалить <b>ВСЕ</b> услуги?\n\n<i>Категории останутся, но станут абсолютно пустыми.</i>",
+        parse_mode="HTML",
+        reply_markup=keyboards.get_confirm_delete_all_services_keyboard()
+    )
+
+
+@router.callback_query(F.data == "action_delete_all_services")
+async def action_delete_all_services_cb(callback: types.CallbackQuery):
+    admin_id = getenv("ADMIN_ID")
+    if not admin_id or str(callback.from_user.id) != admin_id:
+        return
+    await delete_all_services()
+    await callback.answer("✅ Все услуги были успешно удалены", show_alert=True)
+    services = await database.get_all_services()
+    await callback.message.edit_text(
+        _format_services_page(services, 0),
+        parse_mode="HTML",
+        reply_markup=keyboards.get_services_keyboard(services, 0)
+    )
+
+
+@router.callback_query(F.data == "confirm_delete_all_categories")
+async def confirm_delete_all_categories_cb(callback: types.CallbackQuery):
+    admin_id = getenv("ADMIN_ID")
+    if not admin_id or str(callback.from_user.id) != admin_id:
+        return
+    await callback.message.edit_text(
+        "⚠️ Вы уверены, что хотите безвозвратно удалить <b>ВСЕ</b> категории?\n\n<i>Все привязанные к ним услуги останутся в базе, но перейдут в общий список \"Свободных услуг\" (Без категории).</i>",
+        parse_mode="HTML",
+        reply_markup=keyboards.get_confirm_delete_all_categories_keyboard()
+    )
+
+
+@router.callback_query(F.data == "action_delete_all_categories")
+async def action_delete_all_categories_cb(callback: types.CallbackQuery):
+    admin_id = getenv("ADMIN_ID")
+    if not admin_id or str(callback.from_user.id) != admin_id:
+        return
+    await delete_all_categories()
+    await callback.answer("✅ Все категории были успешно удалены", show_alert=True)
+    categories = await database.get_all_categories()
+    text = build_category_list_text(categories)
+    await callback.message.edit_text(
+        text,
+        parse_mode="HTML",
+        reply_markup=keyboards.get_categories_keyboard(categories)
+    )

@@ -81,6 +81,11 @@ async def delete_service(service_id: int):
         await db.execute("DELETE FROM services WHERE id = ?", (service_id,))
         await db.commit()
 
+async def delete_all_services():
+    async with db_connect() as db:
+        await db.execute("DELETE FROM services")
+        await db.commit()
+
 async def update_service_duration(service_id: int, duration: int):
     async with db_connect() as db:
         await db.execute("UPDATE services SET duration=? WHERE id=?", (duration, service_id))
