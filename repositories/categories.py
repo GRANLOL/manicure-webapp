@@ -69,3 +69,9 @@ async def delete_category(category_id: int):
         await db.execute("UPDATE categories SET parent_id = ? WHERE parent_id = ?", (parent_id, category_id))
         await db.execute("DELETE FROM categories WHERE id = ?", (category_id,))
         await db.commit()
+
+async def delete_all_categories():
+    async with db_connect() as db:
+        await db.execute("UPDATE services SET category_id = NULL")
+        await db.execute("DELETE FROM categories")
+        await db.commit()
