@@ -4,7 +4,6 @@ from unittest.mock import ANY, AsyncMock, patch
 
 import booking_service
 import bot_handlers.client as client_handlers
-import bot_handlers.reminders as reminder_handlers
 from tests.support import make_callback, make_message, make_state
 
 
@@ -244,43 +243,6 @@ class ClientFlowTests(unittest.IsolatedAsyncioTestCase):
         state.clear.assert_awaited_once()
         callback.message.edit_text.assert_awaited_once_with(ANY, parse_mode="HTML")
 
-
-class ReminderFlowTests(unittest.IsolatedAsyncioTestCase):
-    async def test_reminder_cancel_rejects_foreign_user(self):
-        callback = make_callback(data="rem_canc_15", user_id=999)
-
-        with patch.object(reminder_handlers.database, "get_booking_by_id", AsyncMock(return_value=("Name", "Phone", "14.03.2026", "10:00", 1, "scheduled"))), \
-             patch.object(reminder_handlers.database, "cancel_booking_by_id", AsyncMock()) as cancel_mock:
-            await reminder_handlers.reminder_cancel_cb(callback)
-
-        callback.answer.assert_awaited_once_with(ANY, show_alert=True)
-        cancel_mock.assert_not_awaited()
-        callback.message.answer.assert_not_awaited()
-
-    async def test_reminder_confirm_success_clears_markup_and_notifies_admin(self):
-        callback = make_callback(data="rem_conf_21", user_id=1)
-        booking = ("Alice", "+100", "14.03.2026", "10:00", 1, "scheduled")
-
-        with patch.object(reminder_handlers.database, "get_booking_by_id", AsyncMock(return_value=booking)), \
-             patch.object(reminder_handlers, "getenv", return_value="777"):
-            await reminder_handlers.reminder_confirm_cb(callback)
-
-        callback.message.edit_reply_markup.assert_awaited_once_with(reply_markup=None)
-        callback.message.answer.assert_awaited_once_with(ANY)
-        callback.bot.send_message.assert_awaited_once()
-
-    async def test_reminder_reschedule_cancels_booking_for_owner(self):
-        callback = make_callback(data="rem_resched_30", user_id=1)
-        booking = ("Alice", "+100", "14.03.2026", "10:00", 1, "scheduled")
-
-        with patch.object(reminder_handlers.database, "get_booking_by_id", AsyncMock(return_value=booking)), \
-             patch.object(reminder_handlers.database, "cancel_booking_by_id", AsyncMock()) as cancel_mock, \
-             patch.object(reminder_handlers, "getenv", return_value=None):
-            await reminder_handlers.reminder_resched_cb(callback)
-
-        cancel_mock.assert_awaited_once_with(30)
-        callback.message.edit_reply_markup.assert_awaited_once_with(reply_markup=None)
-        callback.message.answer.assert_awaited_once_with(ANY)
 
 
 class BookingServiceTests(unittest.IsolatedAsyncioTestCase):

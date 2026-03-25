@@ -16,7 +16,6 @@ from database import (
     mark_second_reminder_sent,
     sync_completed_bookings,
 )
-from keyboards import get_reminder_keyboard
 from runtime_state import get_runtime_value, set_runtime_value
 from time_utils import get_salon_now
 
@@ -62,7 +61,7 @@ async def check_reminders(bot: Bot):
             )
             msg = format_reminder(template_1, name, date_str, time_str)
             try:
-                await bot.send_message(user_id, text=msg, reply_markup=get_reminder_keyboard(booking_id), parse_mode="HTML")
+                await bot.send_message(user_id, text=msg, parse_mode="HTML")
                 await mark_first_reminder_sent(booking_id, now_iso)
             except Exception as exc:
                 logger.error("Failed to send 24h reminder to %s: %s", user_id, exc)
@@ -79,7 +78,7 @@ async def check_reminders(bot: Bot):
             )
             msg = format_reminder(template_2, name, date_str, time_str)
             try:
-                await bot.send_message(user_id, text=msg, reply_markup=get_reminder_keyboard(booking_id), parse_mode="HTML")
+                await bot.send_message(user_id, text=msg, parse_mode="HTML")
                 await mark_second_reminder_sent(booking_id, now_iso)
             except Exception as exc:
                 logger.error("Failed to send configurable reminder to %s: %s", user_id, exc)
