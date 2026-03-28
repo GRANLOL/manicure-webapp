@@ -78,13 +78,12 @@ def get_client_price_keyboard(page: int, total_pages: int):
     if page > 0:
         nav_buttons.append(InlineKeyboardButton(text="⬅️ Назад", callback_data=f"client_price_page_{page - 1}"))
     if page < total_pages - 1:
-        nav_buttons.append(InlineKeyboardButton(text="Вперед ➡️", callback_data=f"client_price_page_{page + 1}"))
+        nav_buttons.append(InlineKeyboardButton(text="Вперёд ➡️", callback_data=f"client_price_page_{page + 1}"))
 
     if nav_buttons:
         builder.row(*nav_buttons)
 
     return builder.as_markup()
-
 
 
 def get_reschedule_dates_keyboard(booking_id: int, options: list[tuple[str, str]]):
@@ -135,6 +134,116 @@ def get_analytics_keyboard():
     return builder.as_markup()
 
 
+def get_excel_exports_keyboard():
+    from aiogram.utils.keyboard import InlineKeyboardBuilder
+
+    builder = InlineKeyboardBuilder()
+    builder.row(InlineKeyboardButton(text="📋 Все записи", callback_data="excel_export_all"))
+    builder.row(InlineKeyboardButton(text="✅ Выполненные услуги", callback_data="excel_export_completed"))
+    builder.row(InlineKeyboardButton(text="👥 Клиентская база", callback_data="excel_export_clients"))
+    builder.row(InlineKeyboardButton(text="❌ Отмена", callback_data="cancel_admin_action"))
+    return builder.as_markup()
+
+
+def get_admin_service_picker_keyboard(services, *, prefix: str, page: int = 0, page_size: int = 12):
+    from aiogram.utils.keyboard import InlineKeyboardBuilder
+
+    builder = InlineKeyboardBuilder()
+    total = len(services)
+    start = page * page_size
+    end = min(start + page_size, total)
+    page_services = services[start:end]
+
+    for service in page_services:
+        category_name = service.get("category_name") or "Без категории"
+        duration = int(service.get("duration") or 60)
+        label = f"{service['name'][:22]} · {duration}м · {category_name[:14]}"
+        builder.row(
+            InlineKeyboardButton(
+                text=label,
+                callback_data=f"{prefix}_service_{page}_{service['id']}",
+            )
+        )
+
+    nav_buttons = []
+    if page > 0:
+        nav_buttons.append(InlineKeyboardButton(text="⬅️ Назад", callback_data=f"{prefix}_service_page_{page - 1}"))
+    if end < total:
+        nav_buttons.append(InlineKeyboardButton(text="Вперёд ➡️", callback_data=f"{prefix}_service_page_{page + 1}"))
+    if nav_buttons:
+        builder.row(*nav_buttons)
+
+    builder.row(InlineKeyboardButton(text="❌ Отмена", callback_data="cancel_admin_action"))
+    return builder.as_markup()
+
+
+def get_admin_date_picker_keyboard(options: list[tuple[str, str]], *, prefix: str, back_callback: str):
+    from aiogram.utils.keyboard import InlineKeyboardBuilder
+
+    builder = InlineKeyboardBuilder()
+    for label, date_value in options:
+        builder.row(InlineKeyboardButton(text=label, callback_data=f"{prefix}_date_{date_value}"))
+    builder.row(InlineKeyboardButton(text="⬅️ Назад", callback_data=back_callback))
+    builder.row(InlineKeyboardButton(text="❌ Отмена", callback_data="cancel_admin_action"))
+    return builder.as_markup()
+
+
+def get_admin_time_picker_keyboard(date_value: str, times: list[str], *, prefix: str, back_callback: str):
+    from aiogram.utils.keyboard import InlineKeyboardBuilder
+
+    builder = InlineKeyboardBuilder()
+    row: list[InlineKeyboardButton] = []
+    for time_value in times:
+        row.append(InlineKeyboardButton(text=time_value, callback_data=f"{prefix}_time_{date_value}_{time_value}"))
+        if len(row) == 3:
+            builder.row(*row)
+            row = []
+    if row:
+        builder.row(*row)
+
+    builder.row(InlineKeyboardButton(text="⬅️ Назад", callback_data=back_callback))
+    builder.row(InlineKeyboardButton(text="❌ Отмена", callback_data="cancel_admin_action"))
+    return builder.as_markup()
+
+
+def get_manual_booking_source_keyboard():
+    from aiogram.utils.keyboard import InlineKeyboardBuilder
+
+    builder = InlineKeyboardBuilder()
+    builder.row(
+        InlineKeyboardButton(text="WhatsApp", callback_data="manual_source_whatsapp"),
+        InlineKeyboardButton(text="Instagram", callback_data="manual_source_instagram"),
+    )
+    builder.row(
+        InlineKeyboardButton(text="Звонок", callback_data="manual_source_phone"),
+        InlineKeyboardButton(text="Telegram", callback_data="manual_source_telegram"),
+    )
+    builder.row(
+        InlineKeyboardButton(text="Офлайн", callback_data="manual_source_offline"),
+        InlineKeyboardButton(text="Вручную", callback_data="manual_source_manual"),
+    )
+    builder.row(InlineKeyboardButton(text="❌ Отмена", callback_data="cancel_admin_action"))
+    return builder.as_markup()
+
+
+def get_manual_booking_notes_keyboard():
+    from aiogram.utils.keyboard import InlineKeyboardBuilder
+
+    builder = InlineKeyboardBuilder()
+    builder.row(InlineKeyboardButton(text="Пропустить", callback_data="manual_notes_skip"))
+    builder.row(InlineKeyboardButton(text="❌ Отмена", callback_data="cancel_admin_action"))
+    return builder.as_markup()
+
+
+def get_manual_booking_confirm_keyboard():
+    from aiogram.utils.keyboard import InlineKeyboardBuilder
+
+    builder = InlineKeyboardBuilder()
+    builder.row(InlineKeyboardButton(text="✅ Подтвердить запись", callback_data="manual_confirm_submit"))
+    builder.row(InlineKeyboardButton(text="❌ Отмена", callback_data="cancel_admin_action"))
+    return builder.as_markup()
+
+
 def get_admin_booking_page_keyboard(bookings, context: str, page: int, total_pages: int):
     from aiogram.utils.keyboard import InlineKeyboardBuilder
 
@@ -160,7 +269,7 @@ def get_admin_booking_page_keyboard(bookings, context: str, page: int, total_pag
     if page > 0:
         nav.append(InlineKeyboardButton(text="⬅️ Назад", callback_data=f"bookings_page_{context}_{page - 1}"))
     if page < total_pages - 1:
-        nav.append(InlineKeyboardButton(text="Вперед ➡️", callback_data=f"bookings_page_{context}_{page + 1}"))
+        nav.append(InlineKeyboardButton(text="Вперёд ➡️", callback_data=f"bookings_page_{context}_{page + 1}"))
     if nav:
         builder.row(*nav)
 
@@ -196,15 +305,27 @@ def get_admin_booking_actions_keyboard(
 
     if status == "scheduled":
         builder.row(
-            InlineKeyboardButton(text="✅ Отметить выполненной", callback_data=f"admin_booking_status_{booking_id}_completed_{context}_{page}"),
-            InlineKeyboardButton(text="🟠 Не пришел", callback_data=f"admin_booking_status_{booking_id}_no_show_{context}_{page}"),
+            InlineKeyboardButton(
+                text="✅ Отметить выполненной",
+                callback_data=f"admin_booking_status_{booking_id}_completed_{context}_{page}",
+            ),
+            InlineKeyboardButton(
+                text="🟠 Не пришел",
+                callback_data=f"admin_booking_status_{booking_id}_no_show_{context}_{page}",
+            ),
         )
         builder.row(
-            InlineKeyboardButton(text="❌ Отменить запись", callback_data=f"admin_booking_status_{booking_id}_cancelled_{context}_{page}")
+            InlineKeyboardButton(
+                text="❌ Отменить запись",
+                callback_data=f"admin_booking_status_{booking_id}_cancelled_{context}_{page}",
+            )
         )
     else:
         builder.row(
-            InlineKeyboardButton(text="🔄 Вернуть в активные", callback_data=f"admin_booking_status_{booking_id}_scheduled_{context}_{page}")
+            InlineKeyboardButton(
+                text="🔄 Вернуть в активные",
+                callback_data=f"admin_booking_status_{booking_id}_scheduled_{context}_{page}",
+            )
         )
 
     builder.row(InlineKeyboardButton(text="⬅️ Назад к списку", callback_data=f"bookings_page_{context}_{page}"))

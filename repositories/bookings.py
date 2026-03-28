@@ -141,7 +141,20 @@ async def sync_completed_bookings() -> int:
     return updated
 
 
-async def add_booking(user_id, name, phone, date, time, duration=60, service_name=None, price=0):
+async def add_booking(
+    user_id,
+    name,
+    phone,
+    date,
+    time,
+    duration=60,
+    service_name=None,
+    price=0,
+    *,
+    source: str = "telegram",
+    notes: str | None = None,
+    created_by_admin: bool = False,
+):
     date_iso = _to_iso_date(date)
     booking_dt = _booking_datetime(date, time)
     schedule = build_reminder_schedule(booking_dt)
@@ -150,12 +163,13 @@ async def add_booking(user_id, name, phone, date, time, duration=60, service_nam
             """
             INSERT INTO bookings (
                 user_id, name, phone, date, date_iso, time, duration, service_name, price,
-                created_at, first_reminder_due_at, second_reminder_due_at, status
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'scheduled')
+                created_at, first_reminder_due_at, second_reminder_due_at, status, source, notes, created_by_admin
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'scheduled', ?, ?, ?)
             """,
             (
                 user_id, name, phone, date, date_iso, time, duration, service_name, price,
                 schedule["created_at"], schedule["first_reminder_due_at"], schedule["second_reminder_due_at"],
+                source, notes, 1 if created_by_admin else 0,
             ),
         )
         await db.commit()
@@ -170,6 +184,11 @@ async def create_booking_if_available(
     duration=60,
     service_name=None,
     price=0,
+    *,
+    source: str = "telegram",
+    notes: str | None = None,
+    created_by_admin: bool = False,
+    enforce_active_limit: bool = True,
 ):
     slot_start = _time_to_minutes(time)
     date_iso = _to_iso_date(date)
@@ -179,15 +198,16 @@ async def create_booking_if_available(
     async with db_connect(timeout=30) as db:
         await db.execute("BEGIN IMMEDIATE")
 
-        active_limit = max(int(salon_config.get("max_active_bookings_per_user", 3) or 3), 1)
-        async with db.execute(
-            "SELECT COUNT(id) FROM bookings WHERE user_id = ? AND status = 'scheduled'",
-            (user_id,),
-        ) as cursor:
-            active_count = (await cursor.fetchone())[0]
-        if active_count >= active_limit:
-            await db.rollback()
-            raise ActiveBookingLimitReachedError(active_limit)
+        if enforce_active_limit:
+            active_limit = max(int(salon_config.get("max_active_bookings_per_user", 3) or 3), 1)
+            async with db.execute(
+                "SELECT COUNT(id) FROM bookings WHERE user_id = ? AND status = 'scheduled'",
+                (user_id,),
+            ) as cursor:
+                active_count = (await cursor.fetchone())[0]
+            if active_count >= active_limit:
+                await db.rollback()
+                raise ActiveBookingLimitReachedError(active_limit)
 
         async with db.execute(
             "SELECT time, duration FROM bookings WHERE date = ? AND status = 'scheduled'",
@@ -216,16 +236,45 @@ async def create_booking_if_available(
             """
             INSERT INTO bookings (
                 user_id, name, phone, date, date_iso, time, duration, service_name, price,
-                created_at, first_reminder_due_at, second_reminder_due_at, status
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'scheduled')
+                created_at, first_reminder_due_at, second_reminder_due_at, status, source, notes, created_by_admin
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'scheduled', ?, ?, ?)
             """,
             (
                 user_id, name, phone, date, date_iso, time, duration, service_name, price,
                 schedule["created_at"], schedule["first_reminder_due_at"], schedule["second_reminder_due_at"],
+                source, notes, 1 if created_by_admin else 0,
             ),
         )
         await db.commit()
         return True
+
+
+async def create_manual_booking(
+    *,
+    name: str,
+    phone: str,
+    date: str,
+    time: str,
+    duration: int = 60,
+    service_name: str | None = None,
+    price: int = 0,
+    source: str = "manual",
+    notes: str | None = None,
+) -> bool:
+    return await create_booking_if_available(
+        user_id=None,
+        name=name,
+        phone=phone,
+        date=date,
+        time=time,
+        duration=duration,
+        service_name=service_name,
+        price=price,
+        source=source,
+        notes=notes,
+        created_by_admin=True,
+        enforce_active_limit=False,
+    )
 
 
 async def get_booked_slots(date):
@@ -262,6 +311,80 @@ async def get_all_bookings():
             FROM bookings b
             WHERE b.status IN ('scheduled', 'completed')
             ORDER BY COALESCE(b.date_iso, b.date), b.time
+            """
+        ) as cursor:
+            return await cursor.fetchall()
+
+
+async def get_all_bookings_export():
+    async with db_connect() as db:
+        async with db.execute(
+            """
+            SELECT
+                b.id,
+                b.name,
+                b.phone,
+                b.service_name,
+                b.date,
+                b.time,
+                b.duration,
+                b.price,
+                b.status,
+                COALESCE(b.source, 'telegram'),
+                COALESCE(b.notes, ''),
+                COALESCE(b.created_by_admin, 0),
+                b.created_at
+            FROM bookings b
+            ORDER BY COALESCE(b.date_iso, b.date) DESC, b.time DESC, b.id DESC
+            """
+        ) as cursor:
+            return await cursor.fetchall()
+
+
+async def get_completed_bookings_export():
+    async with db_connect() as db:
+        async with db.execute(
+            """
+            SELECT
+                b.id,
+                b.name,
+                b.phone,
+                b.service_name,
+                b.date,
+                b.time,
+                b.duration,
+                b.price,
+                b.status,
+                COALESCE(b.source, 'telegram'),
+                COALESCE(b.notes, ''),
+                COALESCE(b.created_by_admin, 0),
+                b.completed_at
+            FROM bookings b
+            WHERE b.status = 'completed'
+            ORDER BY COALESCE(b.date_iso, b.date) DESC, b.time DESC, b.id DESC
+            """
+        ) as cursor:
+            return await cursor.fetchall()
+
+
+async def get_client_base_export():
+    async with db_connect() as db:
+        async with db.execute(
+            """
+            SELECT
+                COALESCE(NULLIF(TRIM(phone), ''), 'Без телефона') AS phone_key,
+                MAX(COALESCE(NULLIF(TRIM(name), ''), 'Без имени')) AS name,
+                MAX(COALESCE(NULLIF(TRIM(phone), ''), '')) AS phone,
+                COUNT(*) AS total_bookings,
+                SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) AS completed_bookings,
+                SUM(CASE WHEN status = 'cancelled' THEN 1 ELSE 0 END) AS cancelled_bookings,
+                SUM(CASE WHEN status = 'no_show' THEN 1 ELSE 0 END) AS no_show_bookings,
+                SUM(CASE WHEN status = 'completed' THEN COALESCE(price, 0) ELSE 0 END) AS completed_revenue,
+                MAX(COALESCE(date_iso, '')) AS last_date_iso,
+                MAX(COALESCE(created_at, '')) AS last_created_at
+            FROM bookings
+            GROUP BY phone_key
+            ORDER BY total_bookings DESC, completed_revenue DESC, name ASC
             """
         ) as cursor:
             return await cursor.fetchall()
@@ -416,6 +539,32 @@ async def get_booking_record_by_id(booking_id: int):
         async with db.execute(
             """
             SELECT id, user_id, name, phone, date, time, status, duration
+            FROM bookings
+            WHERE id = ?
+            """,
+            (booking_id,),
+        ) as cursor:
+            return await cursor.fetchone()
+
+
+async def get_booking_admin_details(booking_id: int):
+    async with db_connect() as db:
+        async with db.execute(
+            """
+            SELECT
+                id,
+                user_id,
+                name,
+                phone,
+                date,
+                time,
+                status,
+                duration,
+                service_name,
+                price,
+                COALESCE(source, 'telegram'),
+                COALESCE(notes, ''),
+                COALESCE(created_by_admin, 0)
             FROM bookings
             WHERE id = ?
             """,

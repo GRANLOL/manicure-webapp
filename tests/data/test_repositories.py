@@ -20,9 +20,11 @@ from repositories.bookings import (
     ActiveBookingLimitReachedError,
     add_blocked_slot,
     cancel_booking_by_id,
+    create_manual_booking,
     create_booking_if_available,
     get_all_busy_slots,
     get_all_bookings,
+    get_booking_admin_details,
     get_busy_slots_by_date,
     reschedule_booking_if_available,
     search_bookings,
@@ -450,6 +452,37 @@ class BookingRepositoryTests(RepositoryTestCase):
                     duration=60,
                 )
 
+    async def test_manual_booking_bypasses_user_active_limit_and_persists_source(self):
+        with patch.dict("repositories.bookings.salon_config", {"max_active_bookings_per_user": 1}, clear=False):
+            created_regular = await create_booking_if_available(
+                user_id=77,
+                name="Alice",
+                phone="+70000000001",
+                date="15.03.2026",
+                time="10:00",
+                duration=60,
+                service_name="Service A",
+                price=2000,
+            )
+            created_manual = await create_manual_booking(
+                name="Bob",
+                phone="+70000000002",
+                date="15.03.2026",
+                time="11:00",
+                duration=60,
+                service_name="Service B",
+                price=3000,
+                source="whatsapp",
+                notes="manual note",
+            )
+
+        details = await get_booking_admin_details(2)
+        self.assertTrue(created_regular)
+        self.assertTrue(created_manual)
+        self.assertEqual(details[10], "whatsapp")
+        self.assertEqual(details[11], "manual note")
+        self.assertEqual(details[12], 1)
+
 
 class CategoryRepositoryTests(RepositoryTestCase):
     async def test_update_category_parent_rejects_descendant_cycle(self):
@@ -530,3 +563,6 @@ class SchemaMigrationTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("time_slots", objects)
         self.assertNotIn("idx_bookings_date_master_time", objects)
         self.assertNotIn("master_id", booking_columns)
+        self.assertIn("source", booking_columns)
+        self.assertIn("notes", booking_columns)
+        self.assertIn("created_by_admin", booking_columns)

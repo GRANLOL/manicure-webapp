@@ -2,14 +2,16 @@ from __future__ import annotations
 
 import os
 from collections import Counter
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from money import format_money
 from openpyxl import Workbook
 from openpyxl.cell.cell import MergedCell
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
-from .states import SearchBookingForm
+from booking_validation import normalize_phone, parse_working_hours, slot_overlaps
+from time_utils import get_salon_now
+from .states import AdminAvailabilityForm, ManualBookingForm, SearchBookingForm
 
 from .base import (
     Command,
@@ -35,6 +37,16 @@ THIN_BORDER = Border(
     bottom=Side(style="thin", color="E7BCCB"),
 )
 BOOKINGS_PAGE_SIZE = 10
+ADMIN_SERVICE_PAGE_SIZE = 12
+
+SOURCE_LABELS = {
+    "telegram": "Telegram",
+    "whatsapp": "WhatsApp",
+    "instagram": "Instagram",
+    "phone": "Звонок",
+    "offline": "Офлайн",
+    "manual": "Вручную",
+}
 
 
 def _status_label(status: str) -> str:
@@ -51,6 +63,89 @@ def _safe_parse_date(value: str) -> datetime | None:
         return datetime.strptime(value, "%d.%m.%Y")
     except ValueError:
         return None
+
+
+def _source_label(source: str | None) -> str:
+    return SOURCE_LABELS.get((source or "").strip(), source or "—")
+
+
+def _format_admin_date_label(target_date: datetime.date) -> str:
+    weekdays = ["пн", "вт", "ср", "чт", "пт", "сб", "вс"]
+    return f"{target_date.strftime('%d.%m')} · {weekdays[target_date.weekday()]}"
+
+
+def _format_iso_to_date(value: str | None) -> str:
+    if not value:
+        return "—"
+    try:
+        return datetime.fromisoformat(value).strftime("%d.%m.%Y %H:%M")
+    except ValueError:
+        return value
+
+
+async def _build_admin_date_options(duration: int) -> list[tuple[str, str]]:
+    salon_now = get_salon_now()
+    booking_window = max(int(salon_config.get("booking_window", 7) or 7), 1)
+    working_days = salon_config.get("working_days", [1, 2, 3, 4, 5, 6, 0])
+    blacklisted_dates = set(salon_config.get("blacklisted_dates", []))
+    options: list[tuple[str, str]] = []
+
+    for offset in range(booking_window):
+        target_date = salon_now.date() + timedelta(days=offset)
+        date_value = target_date.strftime("%d.%m.%Y")
+        js_weekday = (target_date.weekday() + 1) % 7
+        if js_weekday not in working_days or date_value in blacklisted_dates:
+            continue
+
+        times = await _build_admin_time_options(date_value, duration)
+        if times:
+            options.append((_format_admin_date_label(target_date), date_value))
+
+    return options
+
+
+async def _build_admin_time_options(date_value: str, duration: int) -> list[str]:
+    start_mins, end_mins = parse_working_hours(salon_config.get("working_hours", "10:00-20:00"))
+    interval = int(salon_config.get("schedule_interval", 30) or 30)
+    if interval <= 0:
+        interval = 30
+
+    busy_slots = await database.get_busy_slots_by_date(date_value)
+    salon_now = get_salon_now()
+    salon_today = salon_now.strftime("%d.%m.%Y")
+    current_salon_mins = salon_now.hour * 60 + salon_now.minute if date_value == salon_today else -1
+
+    available_times: list[str] = []
+    duration_minutes = int(duration or 60)
+    for slot_start in range(start_mins, end_mins - duration_minutes + 1, interval):
+        if slot_start <= current_salon_mins:
+            continue
+
+        is_busy = False
+        for busy in busy_slots:
+            try:
+                busy_h, busy_m = map(int, busy["time"].split(":"))
+            except (KeyError, ValueError, AttributeError):
+                continue
+            busy_start = busy_h * 60 + busy_m
+            busy_duration = int(busy.get("duration") or 60)
+            if slot_overlaps(slot_start, duration_minutes, busy_start, busy_duration):
+                is_busy = True
+                break
+
+        if not is_busy:
+            available_times.append(f"{slot_start // 60:02d}:{slot_start % 60:02d}")
+
+    return available_times
+
+
+def _find_service_by_id(services: list[dict], service_id: int | None) -> dict | None:
+    if service_id is None:
+        return None
+    for service in services:
+        if int(service.get("id") or 0) == int(service_id):
+            return service
+    return None
 
 
 def _fit_columns(ws) -> None:
@@ -149,6 +244,188 @@ def _build_bookings_workbook(file_path: str, bookings: list[tuple[str, str, str,
     daily_ws.auto_filter.ref = daily_ws.dimensions
     _fit_columns(daily_ws)
 
+    workbook.save(file_path)
+
+
+def _build_all_bookings_export_workbook(file_path: str, bookings: list[tuple]) -> None:
+    workbook = Workbook()
+    summary_ws = workbook.active
+    summary_ws.title = "Сводка"
+    bookings_ws = workbook.create_sheet("Все записи")
+
+    salon_name = salon_config.get("salon_name", "Салон")
+    generated_at = datetime.now().strftime("%d.%m.%Y %H:%M")
+    parsed_dates = [parsed for *_, date, _time, _duration, _price, _status, _source, _notes, _created_by_admin, _created_at in bookings if (parsed := _safe_parse_date(date))]
+    min_date = min(parsed_dates).strftime("%d.%m.%Y") if parsed_dates else "-"
+    max_date = max(parsed_dates).strftime("%d.%m.%Y") if parsed_dates else "-"
+
+    summary_rows = [
+        ("Отчет", f"Все записи салона «{salon_name}»"),
+        ("Сформирован", generated_at),
+        ("Всего записей", len(bookings)),
+        ("Период данных", f"{min_date} - {max_date}"),
+        ("Выполненных", sum(1 for booking in bookings if booking[8] == "completed")),
+        ("Отмененных", sum(1 for booking in bookings if booking[8] == "cancelled")),
+        ("Не пришли", sum(1 for booking in bookings if booking[8] == "no_show")),
+    ]
+
+    summary_ws["A1"] = "Экспорт всех записей"
+    summary_ws["A1"].font = Font(size=16, bold=True, color="6B2B43")
+    summary_ws.merge_cells("A1:B1")
+    for idx, (label, value) in enumerate(summary_rows, start=3):
+        summary_ws[f"A{idx}"] = label
+        summary_ws[f"B{idx}"] = value
+        summary_ws[f"A{idx}"].font = Font(bold=True, color="6B2B43")
+        summary_ws[f"A{idx}"].fill = SUBHEADER_FILL
+        summary_ws[f"A{idx}"].border = THIN_BORDER
+        summary_ws[f"B{idx}"].border = THIN_BORDER
+    _fit_columns(summary_ws)
+
+    bookings_ws.append(
+        ["№", "Клиент", "Телефон", "Услуга", "Дата", "Время", "Длит.", "Цена", "Статус", "Источник", "Комментарий", "Создано"]
+    )
+    for idx, (_id, name, phone, service_name, date, time, duration, price, status, source, notes, created_by_admin, created_at) in enumerate(bookings, start=1):
+        bookings_ws.append(
+            [
+                idx,
+                name,
+                phone,
+                service_name or "—",
+                date,
+                time,
+                int(duration or 0),
+                int(price or 0),
+                _status_label(status),
+                _source_label(source),
+                notes or "",
+                _format_iso_to_date(created_at),
+            ]
+        )
+    _style_table_header(bookings_ws[1])
+    if bookings_ws.max_row > 1:
+        _style_data_rows(bookings_ws, 2, bookings_ws.max_row, center_columns={1, 5, 6, 7, 8, 9})
+    bookings_ws.freeze_panes = "A2"
+    bookings_ws.auto_filter.ref = bookings_ws.dimensions
+    for cell in bookings_ws["H"][1:]:
+        cell.number_format = f'#,##0 "{salon_config.get("currency_symbol", "₸")}"'
+    _fit_columns(bookings_ws)
+    workbook.save(file_path)
+
+
+def _build_completed_services_workbook(file_path: str, bookings: list[tuple]) -> None:
+    workbook = Workbook()
+    summary_ws = workbook.active
+    summary_ws.title = "Сводка"
+    completed_ws = workbook.create_sheet("Выполненные")
+
+    salon_name = salon_config.get("salon_name", "Салон")
+    generated_at = datetime.now().strftime("%d.%m.%Y %H:%M")
+    total_revenue = sum(int(booking[7] or 0) for booking in bookings)
+
+    summary_rows = [
+        ("Отчет", f"Выполненные услуги салона «{salon_name}»"),
+        ("Сформирован", generated_at),
+        ("Всего выполнено", len(bookings)),
+        ("Сумма", format_money(total_revenue)),
+    ]
+
+    summary_ws["A1"] = "Отчет по выполненным услугам"
+    summary_ws["A1"].font = Font(size=16, bold=True, color="6B2B43")
+    summary_ws.merge_cells("A1:B1")
+    for idx, (label, value) in enumerate(summary_rows, start=3):
+        summary_ws[f"A{idx}"] = label
+        summary_ws[f"B{idx}"] = value
+        summary_ws[f"A{idx}"].font = Font(bold=True, color="6B2B43")
+        summary_ws[f"A{idx}"].fill = SUBHEADER_FILL
+        summary_ws[f"A{idx}"].border = THIN_BORDER
+        summary_ws[f"B{idx}"].border = THIN_BORDER
+    _fit_columns(summary_ws)
+
+    completed_ws.append(["№", "Клиент", "Телефон", "Услуга", "Дата", "Время", "Длит.", "Цена", "Источник", "Комментарий", "Выполнено"])
+    for idx, (_id, name, phone, service_name, date, time, duration, price, _status, source, notes, _created_by_admin, completed_at) in enumerate(bookings, start=1):
+        completed_ws.append(
+            [
+                idx,
+                name,
+                phone,
+                service_name or "—",
+                date,
+                time,
+                int(duration or 0),
+                int(price or 0),
+                _source_label(source),
+                notes or "",
+                _format_iso_to_date(completed_at),
+            ]
+        )
+    _style_table_header(completed_ws[1])
+    if completed_ws.max_row > 1:
+        _style_data_rows(completed_ws, 2, completed_ws.max_row, center_columns={1, 5, 6, 7, 8})
+    completed_ws.freeze_panes = "A2"
+    completed_ws.auto_filter.ref = completed_ws.dimensions
+    for cell in completed_ws["H"][1:]:
+        cell.number_format = f'#,##0 "{salon_config.get("currency_symbol", "₸")}"'
+    _fit_columns(completed_ws)
+    workbook.save(file_path)
+
+
+def _build_clients_workbook(file_path: str, clients: list[tuple]) -> None:
+    workbook = Workbook()
+    summary_ws = workbook.active
+    summary_ws.title = "Сводка"
+    clients_ws = workbook.create_sheet("Клиенты")
+
+    generated_at = datetime.now().strftime("%d.%m.%Y %H:%M")
+    total_completed_revenue = sum(int(client[7] or 0) for client in clients)
+    summary_rows = [
+        ("Сформирован", generated_at),
+        ("Клиентов в базе", len(clients)),
+        ("Всего выполненных визитов", sum(int(client[4] or 0) for client in clients)),
+        ("Сумма по выполненным", format_money(total_completed_revenue)),
+    ]
+
+    summary_ws["A1"] = "Клиентская база"
+    summary_ws["A1"].font = Font(size=16, bold=True, color="6B2B43")
+    summary_ws.merge_cells("A1:B1")
+    for idx, (label, value) in enumerate(summary_rows, start=3):
+        summary_ws[f"A{idx}"] = label
+        summary_ws[f"B{idx}"] = value
+        summary_ws[f"A{idx}"].font = Font(bold=True, color="6B2B43")
+        summary_ws[f"A{idx}"].fill = SUBHEADER_FILL
+        summary_ws[f"A{idx}"].border = THIN_BORDER
+        summary_ws[f"B{idx}"].border = THIN_BORDER
+    _fit_columns(summary_ws)
+
+    clients_ws.append(["№", "Клиент", "Телефон", "Всего записей", "Выполнено", "Отменено", "Не пришел", "Сумма", "Последняя запись", "Последнее создание"])
+    for idx, (_phone_key, name, phone, total, completed, cancelled, no_show, revenue, last_date_iso, last_created_at) in enumerate(clients, start=1):
+        last_visit = "—"
+        if last_date_iso:
+            try:
+                last_visit = datetime.fromisoformat(last_date_iso).strftime("%d.%m.%Y")
+            except ValueError:
+                last_visit = last_date_iso
+        clients_ws.append(
+            [
+                idx,
+                name,
+                phone or "—",
+                int(total or 0),
+                int(completed or 0),
+                int(cancelled or 0),
+                int(no_show or 0),
+                int(revenue or 0),
+                last_visit,
+                _format_iso_to_date(last_created_at),
+            ]
+        )
+    _style_table_header(clients_ws[1])
+    if clients_ws.max_row > 1:
+        _style_data_rows(clients_ws, 2, clients_ws.max_row, center_columns={1, 4, 5, 6, 7, 8})
+    clients_ws.freeze_panes = "A2"
+    clients_ws.auto_filter.ref = clients_ws.dimensions
+    for cell in clients_ws["H"][1:]:
+        cell.number_format = f'#,##0 "{salon_config.get("currency_symbol", "₸")}"'
+    _fit_columns(clients_ws)
     workbook.save(file_path)
 
 
@@ -302,6 +579,132 @@ async def cancel_admin_action_callback(callback: types.CallbackQuery, state):
     await callback.message.delete()
 
 
+async def _send_excel_export(
+    message: types.Message,
+    *,
+    file_path: str,
+    caption: str,
+    build_fn,
+    rows,
+):
+    if not rows:
+        await message.answer("📃 <b>Для выбранной выгрузки пока нет данных</b>", parse_mode="HTML")
+        return
+
+    build_fn(file_path, rows)
+    try:
+        await message.answer_document(FSInputFile(file_path), caption=caption, parse_mode="HTML")
+    finally:
+        if os.path.exists(file_path):
+            os.remove(file_path)
+
+
+@router.message(F.text == "📃 Excel")
+async def export_excel_menu_handler(message: types.Message):
+    admin_id = getenv("ADMIN_ID")
+    if not admin_id or str(message.from_user.id) != admin_id:
+        return
+
+    await message.answer(
+        "📃 <b>Excel-выгрузки</b>\n\nВыберите нужный формат отчета.",
+        parse_mode="HTML",
+        reply_markup=keyboards.get_excel_exports_keyboard(),
+    )
+
+
+@router.callback_query(F.data == "excel_export_all")
+async def export_all_excel_callback(callback: types.CallbackQuery):
+    admin_id = getenv("ADMIN_ID")
+    if not admin_id or str(callback.from_user.id) != admin_id:
+        return
+
+    await callback.answer()
+    rows = await database.get_all_bookings_export()
+    await _send_excel_export(
+        callback.message,
+        file_path="bookings_all_export.xlsx",
+        caption="📋 <b>Все записи</b>",
+        build_fn=_build_all_bookings_export_workbook,
+        rows=rows,
+    )
+
+
+@router.callback_query(F.data == "excel_export_completed")
+async def export_completed_excel_callback(callback: types.CallbackQuery):
+    admin_id = getenv("ADMIN_ID")
+    if not admin_id or str(callback.from_user.id) != admin_id:
+        return
+
+    await callback.answer()
+    rows = await database.get_completed_bookings_export()
+    await _send_excel_export(
+        callback.message,
+        file_path="bookings_completed_export.xlsx",
+        caption="✅ <b>Выполненные услуги</b>",
+        build_fn=_build_completed_services_workbook,
+        rows=rows,
+    )
+
+
+@router.callback_query(F.data == "excel_export_clients")
+async def export_clients_excel_callback(callback: types.CallbackQuery):
+    admin_id = getenv("ADMIN_ID")
+    if not admin_id or str(callback.from_user.id) != admin_id:
+        return
+
+    await callback.answer()
+    rows = await database.get_client_base_export()
+    await _send_excel_export(
+        callback.message,
+        file_path="clients_export.xlsx",
+        caption="👥 <b>Клиентская база</b>",
+        build_fn=_build_clients_workbook,
+        rows=rows,
+    )
+
+
+@router.message(F.text == "➕ Внести запись")
+async def manual_booking_start_handler(message: types.Message, state):
+    admin_id = getenv("ADMIN_ID")
+    if not admin_id or str(message.from_user.id) != admin_id:
+        return
+
+    services = await database.get_all_services()
+    if not services:
+        await message.answer("⚙️ Сначала добавьте хотя бы одну услугу.", parse_mode="HTML")
+        return
+
+    await state.clear()
+    await state.set_state(ManualBookingForm.service_id)
+    await state.update_data(service_page=0)
+    await message.answer(
+        "➕ <b>Ручная запись</b>\n\nВыберите услугу для новой записи.",
+        parse_mode="HTML",
+        reply_markup=keyboards.get_admin_service_picker_keyboard(services, prefix="manual", page=0, page_size=ADMIN_SERVICE_PAGE_SIZE),
+    )
+
+
+@router.message(F.text == "🕒 Свободные окна")
+async def admin_availability_start_handler(message: types.Message, state):
+    admin_id = getenv("ADMIN_ID")
+    if not admin_id or str(message.from_user.id) != admin_id:
+        return
+
+    services = await database.get_all_services()
+    if not services:
+        await message.answer("⚙️ Сначала добавьте хотя бы одну услугу.", parse_mode="HTML")
+        return
+
+    await state.clear()
+    await state.set_state(AdminAvailabilityForm.service_id)
+    await state.update_data(availability_page=0)
+    await message.answer(
+        "🕒 <b>Свободные окна</b>\n\nВыберите услугу, чтобы посмотреть доступные слоты.",
+        parse_mode="HTML",
+        reply_markup=keyboards.get_admin_service_picker_keyboard(services, prefix="avail", page=0, page_size=ADMIN_SERVICE_PAGE_SIZE),
+    )
+
+
 @router.message(Command("export_excel"))
 @router.message(F.text == "📃 Excel")
 async def export_excel_handler(message: types.Message):
@@ -342,6 +745,387 @@ async def todays_bookings_handler(message: types.Message):
     if not admin_id or str(message.from_user.id) != admin_id:
         return
     await _show_booking_list(message, context="today", page=0)
+
+
+@router.callback_query(F.data.startswith("manual_service_page_"))
+async def manual_service_page_callback(callback: types.CallbackQuery, state):
+    admin_id = getenv("ADMIN_ID")
+    if not admin_id or str(callback.from_user.id) != admin_id:
+        return
+
+    await callback.answer()
+    page = int(callback.data.rsplit("_", 1)[-1])
+    services = await database.get_all_services()
+    await state.set_state(ManualBookingForm.service_id)
+    await state.update_data(service_page=page)
+    await callback.message.edit_text(
+        "➕ <b>Ручная запись</b>\n\nВыберите услугу для новой записи.",
+        parse_mode="HTML",
+        reply_markup=keyboards.get_admin_service_picker_keyboard(services, prefix="manual", page=page, page_size=ADMIN_SERVICE_PAGE_SIZE),
+    )
+
+
+@router.callback_query(F.data.startswith("manual_service_"))
+async def manual_service_callback(callback: types.CallbackQuery, state):
+    admin_id = getenv("ADMIN_ID")
+    if not admin_id or str(callback.from_user.id) != admin_id:
+        return
+
+    await callback.answer()
+    _, _, page_str, service_id_str = callback.data.split("_", 3)
+    services = await database.get_all_services()
+    service = _find_service_by_id(services, int(service_id_str))
+    if not service:
+        await callback.answer("Услуга не найдена", show_alert=True)
+        return
+
+    options = await _build_admin_date_options(int(service.get("duration") or 60))
+    await state.set_state(ManualBookingForm.date)
+    await state.update_data(service_id=service["id"], service_page=int(page_str))
+    if not options:
+        await callback.message.edit_text(
+            "➕ <b>Ручная запись</b>\n\nДля этой услуги сейчас нет доступных дат в окне записи.",
+            parse_mode="HTML",
+            reply_markup=keyboards.get_cancel_admin_action_keyboard(back_callback=f"manual_service_page_{page_str}", back_text="⬅️ Назад к услугам"),
+        )
+        return
+
+    await callback.message.edit_text(
+        (
+            "➕ <b>Ручная запись</b>\n\n"
+            f"<b>Услуга:</b> {escape(service['name'])}\n"
+            "Выберите дату."
+        ),
+        parse_mode="HTML",
+        reply_markup=keyboards.get_admin_date_picker_keyboard(
+            options,
+            prefix="manual",
+            back_callback=f"manual_service_page_{page_str}",
+        ),
+    )
+
+
+@router.callback_query(F.data.startswith("manual_date_"))
+async def manual_date_callback(callback: types.CallbackQuery, state):
+    admin_id = getenv("ADMIN_ID")
+    if not admin_id or str(callback.from_user.id) != admin_id:
+        return
+
+    await callback.answer()
+    date_value = callback.data.replace("manual_date_", "", 1)
+    data = await state.get_data()
+    services = await database.get_all_services()
+    service = _find_service_by_id(services, data.get("service_id"))
+    if not service:
+        await callback.answer("Услуга не найдена", show_alert=True)
+        return
+
+    times = await _build_admin_time_options(date_value, int(service.get("duration") or 60))
+    await state.set_state(ManualBookingForm.time)
+    await state.update_data(date=date_value)
+    if not times:
+        await callback.message.edit_text(
+            "➕ <b>Ручная запись</b>\n\nНа эту дату подходящих слотов нет. Выберите другую дату.",
+            parse_mode="HTML",
+            reply_markup=keyboards.get_admin_date_picker_keyboard(
+                await _build_admin_date_options(int(service.get("duration") or 60)),
+                prefix="manual",
+                back_callback=f"manual_service_page_{data.get('service_page', 0)}",
+            ),
+        )
+        return
+
+    await callback.message.edit_text(
+        (
+            "➕ <b>Ручная запись</b>\n\n"
+            f"<b>Услуга:</b> {escape(service['name'])}\n"
+            f"<b>Дата:</b> {escape(date_value)}\n"
+            "Выберите время."
+        ),
+        parse_mode="HTML",
+        reply_markup=keyboards.get_admin_time_picker_keyboard(
+            date_value,
+            times,
+            prefix="manual",
+            back_callback="manual_date_back",
+        ),
+    )
+
+
+@router.callback_query(F.data == "manual_date_back")
+async def manual_date_back_callback(callback: types.CallbackQuery, state):
+    admin_id = getenv("ADMIN_ID")
+    if not admin_id or str(callback.from_user.id) != admin_id:
+        return
+
+    await callback.answer()
+    data = await state.get_data()
+    services = await database.get_all_services()
+    service = _find_service_by_id(services, data.get("service_id"))
+    if not service:
+        await callback.answer("Услуга не найдена", show_alert=True)
+        return
+
+    options = await _build_admin_date_options(int(service.get("duration") or 60))
+    await state.set_state(ManualBookingForm.date)
+    await callback.message.edit_text(
+        (
+            "➕ <b>Ручная запись</b>\n\n"
+            f"<b>Услуга:</b> {escape(service['name'])}\n"
+            "Выберите дату."
+        ),
+        parse_mode="HTML",
+        reply_markup=keyboards.get_admin_date_picker_keyboard(
+            options,
+            prefix="manual",
+            back_callback=f"manual_service_page_{data.get('service_page', 0)}",
+        ),
+    )
+
+
+@router.callback_query(F.data.startswith("manual_time_"))
+async def manual_time_callback(callback: types.CallbackQuery, state):
+    admin_id = getenv("ADMIN_ID")
+    if not admin_id or str(callback.from_user.id) != admin_id:
+        return
+
+    await callback.answer()
+    _, _, date_value, time_value = callback.data.split("_", 3)
+    await state.set_state(ManualBookingForm.name)
+    await state.update_data(date=date_value, time=time_value)
+    await callback.message.answer(
+        (
+            "➕ <b>Ручная запись</b>\n\n"
+            f"<b>Дата:</b> {escape(date_value)}\n"
+            f"<b>Время:</b> {escape(time_value)}\n\n"
+            "Введите имя клиента."
+        ),
+        parse_mode="HTML",
+    )
+
+
+@router.message(ManualBookingForm.name)
+async def manual_booking_name_handler(message: types.Message, state):
+    name = (message.text or "").strip()
+    if len(name) < 2:
+        await message.answer("Введите имя клиента не короче 2 символов.")
+        return
+
+    await state.set_state(ManualBookingForm.phone)
+    await state.update_data(name=name)
+    await message.answer("Введите телефон клиента в формате +7.")
+
+
+@router.message(ManualBookingForm.phone)
+async def manual_booking_phone_handler(message: types.Message, state):
+    phone = normalize_phone(message.text)
+    if not phone:
+        await message.answer("Телефон не похож на корректный номер. Используйте формат +7.")
+        return
+
+    await state.set_state(ManualBookingForm.source)
+    await state.update_data(phone=phone)
+    await message.answer(
+        "Выберите источник записи.",
+        reply_markup=keyboards.get_manual_booking_source_keyboard(),
+    )
+
+
+@router.callback_query(F.data.startswith("manual_source_"))
+async def manual_booking_source_callback(callback: types.CallbackQuery, state):
+    admin_id = getenv("ADMIN_ID")
+    if not admin_id or str(callback.from_user.id) != admin_id:
+        return
+
+    await callback.answer()
+    source = callback.data.replace("manual_source_", "", 1)
+    await state.set_state(ManualBookingForm.notes)
+    await state.update_data(source=source)
+    await callback.message.answer(
+        "Добавьте комментарий к записи или нажмите «Пропустить».",
+        reply_markup=keyboards.get_manual_booking_notes_keyboard(),
+    )
+
+
+@router.callback_query(F.data == "manual_notes_skip")
+async def manual_booking_notes_skip_callback(callback: types.CallbackQuery, state):
+    admin_id = getenv("ADMIN_ID")
+    if not admin_id or str(callback.from_user.id) != admin_id:
+        return
+
+    await callback.answer()
+    await state.update_data(notes="")
+    await state.set_state(ManualBookingForm.confirm)
+    await _show_manual_booking_confirmation(callback.message, state)
+
+
+async def _show_manual_booking_confirmation(message: types.Message, state):
+    data = await state.get_data()
+    services = await database.get_all_services()
+    service = _find_service_by_id(services, data.get("service_id"))
+    if not service:
+        await message.answer("Не удалось собрать карточку записи: услуга не найдена.")
+        return
+
+    text = (
+        "📝 <b>Подтверждение ручной записи</b>\n\n"
+        f"<b>Услуга:</b> {escape(service['name'])}\n"
+        f"<b>Дата:</b> {escape(data['date'])}\n"
+        f"<b>Время:</b> {escape(data['time'])}\n"
+        f"<b>Клиент:</b> {escape(data['name'])}\n"
+        f"<b>Телефон:</b> {escape(data['phone'])}\n"
+        f"<b>Источник:</b> {escape(_source_label(data.get('source')))}\n"
+        f"<b>Комментарий:</b> {escape(data.get('notes') or '—')}\n"
+        f"<b>Стоимость:</b> {escape(format_money(service.get('price_value') or 0))}"
+    )
+    await message.answer(text, parse_mode="HTML", reply_markup=keyboards.get_manual_booking_confirm_keyboard())
+
+
+@router.message(ManualBookingForm.notes)
+async def manual_booking_notes_handler(message: types.Message, state):
+    notes = (message.text or "").strip()
+    await state.update_data(notes=notes)
+    await state.set_state(ManualBookingForm.confirm)
+    await _show_manual_booking_confirmation(message, state)
+
+
+@router.callback_query(F.data == "manual_confirm_submit")
+async def manual_booking_confirm_callback(callback: types.CallbackQuery, state):
+    admin_id = getenv("ADMIN_ID")
+    if not admin_id or str(callback.from_user.id) != admin_id:
+        return
+
+    await callback.answer()
+    data = await state.get_data()
+    services = await database.get_all_services()
+    service = _find_service_by_id(services, data.get("service_id"))
+    if not service:
+        await callback.message.answer("Услуга не найдена. Начните создание записи заново.")
+        await state.clear()
+        return
+
+    created = await database.create_manual_booking(
+        name=data["name"],
+        phone=data["phone"],
+        date=data["date"],
+        time=data["time"],
+        duration=int(service.get("duration") or 60),
+        service_name=service["name"],
+        price=int(service.get("price_value") or 0),
+        source=str(data.get("source") or "manual"),
+        notes=(data.get("notes") or "").strip() or None,
+    )
+    if not created:
+        times = await _build_admin_time_options(data["date"], int(service.get("duration") or 60))
+        await state.set_state(ManualBookingForm.time)
+        await callback.message.answer(
+            "Этот слот уже заняли. Выберите другое время.",
+            reply_markup=keyboards.get_admin_time_picker_keyboard(
+                data["date"],
+                times,
+                prefix="manual",
+                back_callback="manual_date_back",
+            ),
+        )
+        return
+
+    await state.clear()
+    await callback.message.answer(
+        (
+            "✅ <b>Запись добавлена</b>\n\n"
+            f"<b>Клиент:</b> {escape(data['name'])}\n"
+            f"<b>Услуга:</b> {escape(service['name'])}\n"
+            f"<b>Когда:</b> {escape(data['date'])} в {escape(data['time'])}\n"
+            f"<b>Источник:</b> {escape(_source_label(data.get('source')))}"
+        ),
+        parse_mode="HTML",
+    )
+
+
+@router.callback_query(F.data.startswith("avail_service_page_"))
+async def availability_service_page_callback(callback: types.CallbackQuery, state):
+    admin_id = getenv("ADMIN_ID")
+    if not admin_id or str(callback.from_user.id) != admin_id:
+        return
+
+    await callback.answer()
+    page = int(callback.data.rsplit("_", 1)[-1])
+    services = await database.get_all_services()
+    await state.set_state(AdminAvailabilityForm.service_id)
+    await state.update_data(availability_page=page)
+    await callback.message.edit_text(
+        "🕒 <b>Свободные окна</b>\n\nВыберите услугу, чтобы посмотреть доступные слоты.",
+        parse_mode="HTML",
+        reply_markup=keyboards.get_admin_service_picker_keyboard(services, prefix="avail", page=page, page_size=ADMIN_SERVICE_PAGE_SIZE),
+    )
+
+
+@router.callback_query(F.data.startswith("avail_service_"))
+async def availability_service_callback(callback: types.CallbackQuery, state):
+    admin_id = getenv("ADMIN_ID")
+    if not admin_id or str(callback.from_user.id) != admin_id:
+        return
+
+    await callback.answer()
+    _, _, page_str, service_id_str = callback.data.split("_", 3)
+    services = await database.get_all_services()
+    service = _find_service_by_id(services, int(service_id_str))
+    if not service:
+        await callback.answer("Услуга не найдена", show_alert=True)
+        return
+
+    options = await _build_admin_date_options(int(service.get("duration") or 60))
+    await state.set_state(AdminAvailabilityForm.date)
+    await state.update_data(service_id=service["id"], availability_page=int(page_str))
+    await callback.message.edit_text(
+        (
+            "🕒 <b>Свободные окна</b>\n\n"
+            f"<b>Услуга:</b> {escape(service['name'])}\n"
+            "Выберите дату."
+        ),
+        parse_mode="HTML",
+        reply_markup=keyboards.get_admin_date_picker_keyboard(
+            options,
+            prefix="avail",
+            back_callback=f"avail_service_page_{page_str}",
+        ),
+    )
+
+
+@router.callback_query(F.data.startswith("avail_date_"))
+async def availability_date_callback(callback: types.CallbackQuery, state):
+    admin_id = getenv("ADMIN_ID")
+    if not admin_id or str(callback.from_user.id) != admin_id:
+        return
+
+    await callback.answer()
+    date_value = callback.data.replace("avail_date_", "", 1)
+    data = await state.get_data()
+    services = await database.get_all_services()
+    service = _find_service_by_id(services, data.get("service_id"))
+    if not service:
+        await callback.answer("Услуга не найдена", show_alert=True)
+        return
+
+    times = await _build_admin_time_options(date_value, int(service.get("duration") or 60))
+    if not times:
+        await callback.message.answer("На эту дату свободных слотов нет.")
+        return
+
+    await callback.message.edit_text(
+        (
+            "🕒 <b>Свободные окна</b>\n\n"
+            f"<b>Услуга:</b> {escape(service['name'])}\n"
+            f"<b>Дата:</b> {escape(date_value)}\n\n"
+            f"{escape(', '.join(times))}"
+        ),
+        parse_mode="HTML",
+        reply_markup=keyboards.get_admin_date_picker_keyboard(
+            await _build_admin_date_options(int(service.get("duration") or 60)),
+            prefix="avail",
+            back_callback=f"avail_service_page_{data.get('availability_page', 0)}",
+        ),
+    )
 
 
 @router.message(F.text == "🔎 Поиск")
@@ -395,7 +1179,49 @@ async def bookings_page_callback(callback: types.CallbackQuery):
 
 
 @router.callback_query(F.data.startswith("booking_actions_"))
-async def booking_actions_callback(callback: types.CallbackQuery):
+async def booking_actions_callback_v2(callback: types.CallbackQuery):
+    admin_id = getenv("ADMIN_ID")
+    if not admin_id or str(callback.from_user.id) != admin_id:
+        return
+
+    await callback.answer()
+    _, _, context, page_str, booking_id_str = callback.data.split("_", 4)
+    booking = await database.get_booking_admin_details(int(booking_id_str))
+    if not booking:
+        await callback.answer("Запись не найдена", show_alert=True)
+        return
+
+    booking_id, user_id, name, phone, date, time, status, duration, service_name, price, source, notes, created_by_admin = booking
+    text = (
+        "📝 <b>Карточка записи</b>\n\n"
+        f"<b>Клиент:</b> {escape(name)}\n"
+        f"<b>Телефон:</b> {escape(phone)}\n"
+        f"<b>Услуга:</b> {escape(service_name or '—')}\n"
+        f"<b>Дата:</b> {escape(date)}\n"
+        f"<b>Время:</b> {escape(time)}\n"
+        f"<b>Длительность:</b> {int(duration or 0)} мин\n"
+        f"<b>Сумма:</b> {escape(format_money(price))}\n"
+        f"<b>Источник:</b> {escape(_source_label(source))}\n"
+        f"<b>Создана админом:</b> {'Да' if int(created_by_admin or 0) else 'Нет'}\n"
+        f"<b>Статус:</b> {escape(_status_label(status))}\n"
+        f"<b>Комментарий:</b> {escape(notes or '—')}"
+    )
+    await callback.message.edit_text(
+        text,
+        parse_mode="HTML",
+        reply_markup=keyboards.get_admin_booking_actions_keyboard(
+            booking_id,
+            phone,
+            context,
+            int(page_str),
+            status=status,
+            telegram_user_id=user_id,
+        ),
+    )
+
+
+@router.callback_query(F.data.startswith("booking_actions_legacy_"))
+async def booking_actions_callback_legacy(callback: types.CallbackQuery):
     admin_id = getenv("ADMIN_ID")
     if not admin_id or str(callback.from_user.id) != admin_id:
         return
@@ -452,3 +1278,4 @@ async def admin_booking_status_callback(callback: types.CallbackQuery):
     await database.update_booking_status(int(booking_id_str), status)
     await callback.answer("Статус обновлен")
     await _show_booking_list(callback, context=context, page=int(page_str))
+booking_actions_callback = booking_actions_callback_v2

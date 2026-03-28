@@ -55,10 +55,10 @@ class GeneralHandlerTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_booking_actions_callback_renders_status_controls(self):
         callback = make_callback(data="booking_actions_all_0_15", user_id=1)
-        booking = (15, 12345, "Alice", "+100", "14.03.2026", "10:00", "scheduled", 60)
+        booking = (15, 12345, "Alice", "+100", "14.03.2026", "10:00", "scheduled", 60, "Service", 2500, "whatsapp", "note", 1)
 
         with patch.object(general_handlers, "getenv", return_value="1"), \
-             patch.object(general_handlers.database, "get_booking_record_by_id", AsyncMock(return_value=booking)), \
+             patch.object(general_handlers.database, "get_booking_admin_details", AsyncMock(return_value=booking)), \
              patch.object(general_handlers.keyboards, "get_admin_booking_actions_keyboard", return_value="actions-kb"):
             await general_handlers.booking_actions_callback(callback)
 

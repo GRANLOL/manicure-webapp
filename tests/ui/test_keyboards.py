@@ -90,3 +90,17 @@ class KeyboardTests(unittest.TestCase):
 
         self.assertIn("settings_booking_window", callback_data)
         self.assertIn("back_to_admin_menu", callback_data)
+
+    def test_admin_menu_contains_manual_booking_actions(self):
+        labels = [button.text for row in menu_keyboards.admin_menu.keyboard for button in row]
+
+        self.assertIn("➕ Внести запись", labels)
+        self.assertIn("🕒 Свободные окна", labels)
+
+    def test_excel_exports_keyboard_contains_all_reports(self):
+        markup = common_keyboards.get_excel_exports_keyboard()
+        callback_data = [button.callback_data for row in markup.inline_keyboard for button in row if button.callback_data]
+
+        self.assertIn("excel_export_all", callback_data)
+        self.assertIn("excel_export_completed", callback_data)
+        self.assertIn("excel_export_clients", callback_data)

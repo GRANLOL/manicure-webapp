@@ -42,19 +42,24 @@ async def _cleanup_legacy_master_schema(db) -> None:
             second_reminder_sent_at TEXT,
             status TEXT DEFAULT 'scheduled',
             completed_at TEXT,
-            cancelled_at TEXT
+            cancelled_at TEXT,
+            source TEXT DEFAULT 'telegram',
+            notes TEXT,
+            created_by_admin INTEGER DEFAULT 0
         )
     """)
     await db.execute("""
         INSERT INTO bookings (
             id, user_id, name, phone, date, time, reminder_level, duration, service_name, price,
             date_iso, created_at, first_reminder_due_at, second_reminder_due_at,
-            first_reminder_sent_at, second_reminder_sent_at, status, completed_at, cancelled_at
+            first_reminder_sent_at, second_reminder_sent_at, status, completed_at, cancelled_at,
+            source, notes, created_by_admin
         )
         SELECT
             id, user_id, name, phone, date, time, reminder_level, duration, service_name, price,
             date_iso, created_at, first_reminder_due_at, second_reminder_due_at,
-            first_reminder_sent_at, second_reminder_sent_at, status, completed_at, cancelled_at
+            first_reminder_sent_at, second_reminder_sent_at, status, completed_at, cancelled_at,
+            'telegram', NULL, 0
         FROM bookings_legacy_master_cleanup
     """)
     await db.execute("DROP TABLE bookings_legacy_master_cleanup")
@@ -151,6 +156,18 @@ async def init_db():
             await db.execute("ALTER TABLE bookings ADD COLUMN cancelled_at TEXT")
         except aiosqlite.OperationalError:
             pass
+        try:
+            await db.execute("ALTER TABLE bookings ADD COLUMN source TEXT DEFAULT 'telegram'")
+        except aiosqlite.OperationalError:
+            pass
+        try:
+            await db.execute("ALTER TABLE bookings ADD COLUMN notes TEXT")
+        except aiosqlite.OperationalError:
+            pass
+        try:
+            await db.execute("ALTER TABLE bookings ADD COLUMN created_by_admin INTEGER DEFAULT 0")
+        except aiosqlite.OperationalError:
+            pass
         await db.execute("""
             CREATE TABLE IF NOT EXISTS blocked_slots (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -172,6 +189,8 @@ async def init_db():
               AND substr(date, 6, 1) = '.'
         """)
         await db.execute("UPDATE bookings SET status = 'scheduled' WHERE status IS NULL OR trim(status) = ''")
+        await db.execute("UPDATE bookings SET source = 'telegram' WHERE source IS NULL OR trim(source) = ''")
+        await db.execute("UPDATE bookings SET created_by_admin = 0 WHERE created_by_admin IS NULL")
         async with db.execute("""
             SELECT id, date, time, reminder_level, created_at, first_reminder_due_at,
                    second_reminder_due_at, first_reminder_sent_at, second_reminder_sent_at

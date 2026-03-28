@@ -112,6 +112,22 @@ class SearchBookingForm(StatesGroup):
     query = State()
 
 
+class ManualBookingForm(StatesGroup):
+    service_id = State()
+    date = State()
+    time = State()
+    name = State()
+    phone = State()
+    source = State()
+    notes = State()
+    confirm = State()
+
+
+class AdminAvailabilityForm(StatesGroup):
+    service_id = State()
+    date = State()
+
+
 class EditMenuButtonForm(StatesGroup):
     target_btn = State()
     label = State()
