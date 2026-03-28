@@ -11,7 +11,7 @@ from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 from booking_validation import normalize_phone, parse_working_hours, slot_overlaps
 from time_utils import get_salon_now
-from .states import AdminAvailabilityForm, AdminBookingsByDateForm, AdminEditBookingForm, ManualBookingForm, SearchBookingForm
+from .states import AdminAvailabilityForm, AdminBookingsByDateForm, AdminEditBookingForm, AdminRescheduleBookingForm, ManualBookingForm, SearchBookingForm
 
 from .base import (
     Command,
@@ -1425,6 +1425,13 @@ def _build_booking_actions_markup(
         types.InlineKeyboardButton(text="📍 Источник", callback_data=f"booking_edit_source|{booking_id}|{context}|{date_token}|{source_filter}|{page}"),
         types.InlineKeyboardButton(text="📝 Комментарий", callback_data=f"booking_edit_notes|{booking_id}|{context}|{date_token}|{source_filter}|{page}"),
     )
+    if status == "scheduled":
+        builder.row(
+            types.InlineKeyboardButton(
+                text="🔁 Перенести",
+                callback_data=f"booking_reschedule|{booking_id}|{context}|{date_token}|{source_filter}|{page}",
+            )
+        )
 
     if status == "scheduled":
         builder.row(
@@ -1828,4 +1835,283 @@ async def booking_edit_notes_value_handler(message: types.Message, state):
         page=int(data["edit_page"]),
         source_filter=data["edit_source_filter"],
         date_value=data.get("edit_date_value"),
+    )
+
+
+def _format_admin_reschedule_date_label(target_date: datetime.date) -> str:
+    weekdays = ["пн", "вт", "ср", "чт", "пт", "сб", "вс"]
+    return f"{target_date.strftime('%d.%m')} · {weekdays[target_date.weekday()]}"
+
+
+async def _build_admin_reschedule_date_options(duration: int) -> list[tuple[str, str]]:
+    salon_now = get_salon_now()
+    booking_window = max(int(salon_config.get("booking_window", 7) or 7), 1)
+    working_days = salon_config.get("working_days", [1, 2, 3, 4, 5, 6, 0])
+    blacklisted_dates = set(salon_config.get("blacklisted_dates", []))
+    options: list[tuple[str, str]] = []
+
+    for offset in range(booking_window):
+        target_date = salon_now.date() + timedelta(days=offset)
+        date_value = target_date.strftime("%d.%m.%Y")
+        js_weekday = (target_date.weekday() + 1) % 7
+        if js_weekday not in working_days or date_value in blacklisted_dates:
+            continue
+
+        times = await _build_admin_reschedule_time_options(date_value, duration)
+        if times:
+            options.append((_format_admin_reschedule_date_label(target_date), date_value))
+
+    return options
+
+
+async def _build_admin_reschedule_time_options(
+    date_value: str,
+    duration: int,
+    *,
+    current_date: str | None = None,
+    current_time: str | None = None,
+) -> list[str]:
+    start_mins, end_mins = parse_working_hours(salon_config.get("working_hours", "10:00-20:00"))
+    interval = int(salon_config.get("schedule_interval", 30) or 30)
+    if interval <= 0:
+        interval = 30
+
+    busy_slots = await database.get_busy_slots_by_date(date_value)
+    if current_date == date_value and current_time:
+        busy_slots = [
+            busy
+            for busy in busy_slots
+            if not (busy.get("time") == current_time and int(busy.get("duration") or 60) == int(duration or 60))
+        ]
+
+    salon_now = get_salon_now()
+    salon_today = salon_now.strftime("%d.%m.%Y")
+    current_salon_mins = salon_now.hour * 60 + salon_now.minute if date_value == salon_today else -1
+
+    available_times: list[str] = []
+    for slot_start in range(start_mins, end_mins - int(duration or 60) + 1, interval):
+        if slot_start <= current_salon_mins:
+            continue
+
+        is_busy = False
+        for busy in busy_slots:
+            try:
+                busy_h, busy_m = map(int, busy["time"].split(":"))
+            except (KeyError, ValueError, AttributeError):
+                continue
+            busy_start = busy_h * 60 + busy_m
+            busy_duration = int(busy.get("duration") or 60)
+            if slot_overlaps(slot_start, int(duration or 60), busy_start, busy_duration):
+                is_busy = True
+                break
+
+        if not is_busy:
+            available_times.append(f"{slot_start // 60:02d}:{slot_start % 60:02d}")
+
+    return available_times
+
+
+def _build_admin_reschedule_dates_markup(booking_id: int, options: list[tuple[str, str]]):
+    from aiogram.utils.keyboard import InlineKeyboardBuilder
+
+    builder = InlineKeyboardBuilder()
+    for label, date_value in options:
+        builder.row(types.InlineKeyboardButton(text=label, callback_data=f"admin_resched_date|{booking_id}|{date_value}"))
+    builder.row(types.InlineKeyboardButton(text="❌ Отмена", callback_data=f"admin_resched_cancel|{booking_id}"))
+    return builder.as_markup()
+
+
+def _build_admin_reschedule_times_markup(booking_id: int, date_value: str, times: list[str]):
+    from aiogram.utils.keyboard import InlineKeyboardBuilder
+
+    builder = InlineKeyboardBuilder()
+    row: list[types.InlineKeyboardButton] = []
+    for time_value in times:
+        row.append(types.InlineKeyboardButton(text=time_value, callback_data=f"admin_resched_time|{booking_id}|{date_value}|{time_value}"))
+        if len(row) == 3:
+            builder.row(*row)
+            row = []
+    if row:
+        builder.row(*row)
+    builder.row(types.InlineKeyboardButton(text="❌ Отмена", callback_data=f"admin_resched_cancel|{booking_id}"))
+    return builder.as_markup()
+
+
+def _build_admin_reschedule_confirm_markup(booking_id: int, date_value: str, time_value: str):
+    from aiogram.utils.keyboard import InlineKeyboardBuilder
+
+    builder = InlineKeyboardBuilder()
+    builder.row(types.InlineKeyboardButton(text="✅ Подтвердить", callback_data=f"admin_resched_confirm|{booking_id}|{date_value}|{time_value}"))
+    builder.row(types.InlineKeyboardButton(text="❌ Отмена", callback_data=f"admin_resched_cancel|{booking_id}"))
+    return builder.as_markup()
+
+
+@router.callback_query(F.data.startswith("booking_reschedule|"))
+async def admin_booking_reschedule_start_callback(callback: types.CallbackQuery, state):
+    admin_id = getenv("ADMIN_ID")
+    if not admin_id or str(callback.from_user.id) != admin_id:
+        return
+
+    await callback.answer()
+    _, booking_id_str, context, date_token, source_filter, page_str = callback.data.split("|", 5)
+    booking = await database.get_booking_record_by_id(int(booking_id_str))
+    if not booking:
+        await callback.answer("Запись не найдена.", show_alert=True)
+        return
+
+    _id, user_id, name, phone, current_date, current_time, status, duration = booking
+    if status != "scheduled":
+        await callback.answer("Эту запись уже нельзя перенести.", show_alert=True)
+        return
+
+    date_options = await _build_admin_reschedule_date_options(int(duration or 60))
+    if not date_options:
+        await callback.answer("Свободных дат для переноса сейчас нет.", show_alert=True)
+        return
+
+    await state.set_state(AdminRescheduleBookingForm.waiting_for_date)
+    await state.update_data(
+        booking_id=int(booking_id_str),
+        booking_context=context,
+        booking_date_value=_normalize_context_value(date_token),
+        booking_source_filter=source_filter,
+        booking_page=int(page_str),
+        booking_name=name,
+        booking_phone=phone,
+        booking_user_id=user_id,
+        current_date=current_date,
+        current_time=current_time,
+        duration=int(duration or 60),
+    )
+    await callback.message.answer(
+        (
+            "🔁 <b>Перенос записи</b>\n\n"
+            f"<b>Сейчас:</b> {escape(current_date)} в {escape(current_time)}\n"
+            "Выберите новую дату:"
+        ),
+        parse_mode="HTML",
+        reply_markup=_build_admin_reschedule_dates_markup(int(booking_id_str), date_options),
+    )
+
+
+@router.callback_query(F.data.startswith("admin_resched_date|"))
+async def admin_booking_reschedule_date_callback(callback: types.CallbackQuery, state):
+    admin_id = getenv("ADMIN_ID")
+    if not admin_id or str(callback.from_user.id) != admin_id:
+        return
+
+    await callback.answer()
+    _, booking_id_str, date_value = callback.data.split("|", 2)
+    data = await state.get_data()
+    if data.get("booking_id") != int(booking_id_str):
+        await callback.answer("Сессия переноса устарела. Начните заново.", show_alert=True)
+        return
+
+    time_options = await _build_admin_reschedule_time_options(
+        date_value,
+        int(data["duration"]),
+        current_date=data.get("current_date"),
+        current_time=data.get("current_time"),
+    )
+    if not time_options:
+        await callback.answer("На эту дату нет свободного времени.", show_alert=True)
+        return
+
+    await state.set_state(AdminRescheduleBookingForm.waiting_for_time)
+    await state.update_data(new_date=date_value)
+    await callback.message.edit_text(
+        (
+            "🔁 <b>Перенос записи</b>\n\n"
+            f"<b>Новая дата:</b> {escape(date_value)}\n"
+            "Выберите новое время:"
+        ),
+        parse_mode="HTML",
+        reply_markup=_build_admin_reschedule_times_markup(int(booking_id_str), date_value, time_options),
+    )
+
+
+@router.callback_query(F.data.startswith("admin_resched_time|"))
+async def admin_booking_reschedule_time_callback(callback: types.CallbackQuery, state):
+    admin_id = getenv("ADMIN_ID")
+    if not admin_id or str(callback.from_user.id) != admin_id:
+        return
+
+    await callback.answer()
+    _, booking_id_str, date_value, time_value = callback.data.split("|", 3)
+    data = await state.get_data()
+    if data.get("booking_id") != int(booking_id_str):
+        await callback.answer("Сессия переноса устарела. Начните заново.", show_alert=True)
+        return
+
+    await state.set_state(AdminRescheduleBookingForm.waiting_for_confirmation)
+    await state.update_data(new_date=date_value, new_time=time_value)
+    await callback.message.edit_text(
+        (
+            "🔁 <b>Подтвердите перенос</b>\n\n"
+            f"<b>Было:</b> {escape(data['current_date'])} в {escape(data['current_time'])}\n"
+            f"<b>Станет:</b> {escape(date_value)} в {escape(time_value)}"
+        ),
+        parse_mode="HTML",
+        reply_markup=_build_admin_reschedule_confirm_markup(int(booking_id_str), date_value, time_value),
+    )
+
+
+@router.callback_query(F.data.startswith("admin_resched_confirm|"))
+async def admin_booking_reschedule_confirm_callback(callback: types.CallbackQuery, state):
+    admin_id = getenv("ADMIN_ID")
+    if not admin_id or str(callback.from_user.id) != admin_id:
+        return
+
+    await callback.answer()
+    _, booking_id_str, date_value, time_value = callback.data.split("|", 3)
+    data = await state.get_data()
+    if data.get("booking_id") != int(booking_id_str):
+        await callback.answer("Сессия переноса устарела. Начните заново.", show_alert=True)
+        return
+
+    moved = await database.reschedule_booking_if_available(int(booking_id_str), date_value, time_value)
+    if not moved:
+        await callback.answer("Этот слот уже занят. Выберите другое время.", show_alert=True)
+        return
+
+    await state.clear()
+    await callback.message.edit_text(
+        (
+            "✅ <b>Запись перенесена</b>\n\n"
+            f"<b>Новая дата:</b> {escape(date_value)}\n"
+            f"<b>Новое время:</b> {escape(time_value)}"
+        ),
+        parse_mode="HTML",
+    )
+    await callback.message.answer(
+        (
+            "📝 <b>Карточка записи обновлена</b>\n\n"
+            f"<b>Клиент:</b> {escape(data['booking_name'])}\n"
+            f"<b>Телефон:</b> {escape(data['booking_phone'])}\n"
+            f"<b>Было:</b> {escape(data['current_date'])} в {escape(data['current_time'])}\n"
+            f"<b>Стало:</b> {escape(date_value)} в {escape(time_value)}"
+        ),
+        parse_mode="HTML",
+    )
+    await _show_booking_card(
+        callback.message,
+        int(booking_id_str),
+        context=data["booking_context"],
+        page=int(data["booking_page"]),
+        source_filter=data["booking_source_filter"],
+        date_value=data.get("booking_date_value"),
+    )
+
+
+@router.callback_query(F.data.startswith("admin_resched_cancel|"))
+async def admin_booking_reschedule_cancel_callback(callback: types.CallbackQuery, state):
+    admin_id = getenv("ADMIN_ID")
+    if not admin_id or str(callback.from_user.id) != admin_id:
+        return
+
+    await state.clear()
+    await callback.answer("Перенос отменен")
+    await callback.message.edit_text(
+        "❌ <b>Перенос отменен</b>\n\nЕсли нужно, можно открыть перенос заново из карточки записи.",
+        parse_mode="HTML",
     )

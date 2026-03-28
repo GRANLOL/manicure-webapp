@@ -138,6 +138,12 @@ class AdminEditBookingForm(StatesGroup):
     notes = State()
 
 
+class AdminRescheduleBookingForm(StatesGroup):
+    waiting_for_date = State()
+    waiting_for_time = State()
+    waiting_for_confirmation = State()
+
+
 class EditMenuButtonForm(StatesGroup):
     target_btn = State()
     label = State()
