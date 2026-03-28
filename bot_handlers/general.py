@@ -48,6 +48,26 @@ SOURCE_LABELS = {
     "manual": "Вручную",
 }
 
+MENU_ESCAPE_TEXTS = {
+    "👤 Главное меню",
+    "👤 Меню клиента",
+    "⚙️ Панель управления",
+    "🗓 Все записи",
+    "🗓 На сегодня",
+    "📅 По дате",
+    "📊 Статистика",
+    "📃 Excel",
+    "🔎 Поиск",
+    "🕒 Свободные окна",
+    "➕ Внести запись",
+    "⚙️ Услуги",
+    "📁 Категории",
+    "🗓 Онлайн-запись",
+    "💎 Услуги и цены",
+    "🗓 Актуальные записи",
+    "🕘 История",
+}
+
 
 def _status_label(status: str) -> str:
     return {
@@ -505,9 +525,11 @@ async def send_client_home(message: types.Message, *, text: str, is_admin: bool)
 
 
 @router.message(Command("start"))
-async def start_handler(message: types.Message):
+async def start_handler(message: types.Message, state=None):
     admin_id = getenv("ADMIN_ID")
     is_admin = bool(admin_id and str(message.from_user.id) == admin_id)
+    if state is not None:
+        await state.clear()
 
     if is_admin:
         await message.answer(
@@ -522,11 +544,13 @@ async def start_handler(message: types.Message):
 
 @router.message(F.text == "👤 Главное меню")
 @router.message(F.text == "👤 Меню клиента")
-async def client_menu_handler(message: types.Message):
+async def client_menu_handler(message: types.Message, state=None):
     admin_id = getenv("ADMIN_ID")
     is_admin = bool(admin_id and str(message.from_user.id) == admin_id)
     if not is_admin:
         return
+    if state is not None:
+        await state.clear()
     await send_client_home(
         message,
         text=(
@@ -540,10 +564,12 @@ async def client_menu_handler(message: types.Message):
 
 @router.message(Command("admin"))
 @router.message(F.text == "⚙️ Панель управления")
-async def admin_handler(message: types.Message):
+async def admin_handler(message: types.Message, state=None):
     admin_id = getenv("ADMIN_ID")
     if not admin_id or str(message.from_user.id) != admin_id:
         return
+    if state is not None:
+        await state.clear()
     await message.answer(
         "⚙️ <b>Панель администратора</b>\n\nВыберите нужный раздел ниже.",
         parse_mode="HTML",
@@ -1580,6 +1606,10 @@ async def bookings_by_date_value_handler(message: types.Message, state):
     if not admin_id or str(message.from_user.id) != admin_id:
         return
     target_date = (message.text or "").strip()
+    if target_date in MENU_ESCAPE_TEXTS:
+        await state.clear()
+        await message.answer("Сценарий просмотра по дате сброшен. Нажмите кнопку ещё раз.")
+        return
     if not _safe_parse_date(target_date):
         await message.answer("Введите дату в формате <code>дд.мм.гггг</code>.", parse_mode="HTML")
         return
