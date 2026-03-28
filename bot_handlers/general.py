@@ -1,5 +1,6 @@
 ﻿from __future__ import annotations
 
+import logging
 import os
 from collections import Counter
 from datetime import datetime, timedelta
@@ -27,6 +28,7 @@ from .base import (
 )
 
 router = Router()
+logger = logging.getLogger(__name__)
 
 HEADER_FILL = PatternFill(fill_type="solid", fgColor="F4C7D9")
 SUBHEADER_FILL = PatternFill(fill_type="solid", fgColor="FAE6EE")
@@ -101,6 +103,23 @@ def _format_iso_to_date(value: str | None) -> str:
         return datetime.fromisoformat(value).strftime("%d.%m.%Y %H:%M")
     except ValueError:
         return value
+
+
+async def _notify_client_about_admin_booking_action(
+    bot,
+    *,
+    user_id: int | None,
+    title: str,
+    lines: list[str],
+) -> None:
+    if not user_id:
+        return
+
+    text = title + "\n\n" + "\n".join(lines)
+    try:
+        await bot.send_message(int(user_id), text, parse_mode="HTML")
+    except Exception:
+        logger.exception("Failed to notify Telegram client about admin booking action", extra={"user_id": user_id})
 
 
 async def _build_admin_date_options(duration: int) -> list[tuple[str, str]]:
@@ -1088,6 +1107,10 @@ async def manual_booking_confirm_callback(callback: types.CallbackQuery, state):
         await state.clear()
         return
 
+    linked_user_id = None
+    if data.get("phone"):
+        linked_user_id = await database.get_existing_user_id_by_phone(data["phone"])
+
     created = await database.create_manual_booking(
         name=data["name"],
         phone=(data.get("phone") or None),
@@ -1112,6 +1135,18 @@ async def manual_booking_confirm_callback(callback: types.CallbackQuery, state):
             ),
         )
         return
+
+    await _notify_client_about_admin_booking_action(
+        callback.bot,
+        user_id=linked_user_id,
+        title="📅 <b>Для вас оформили запись</b>",
+        lines=[
+            f"<b>Услуга:</b> {escape(service['name'])}",
+            f"<b>Дата:</b> {escape(data['date'])}",
+            f"<b>Время:</b> {escape(data['time'])}",
+            f"<b>Телефон:</b> {escape(data.get('phone') or '—')}",
+        ],
+    )
 
     await state.clear()
     await callback.message.answer(
@@ -1364,7 +1399,24 @@ async def admin_booking_status_callback(callback: types.CallbackQuery):
     booking_id_str = payload[:first_separator]
     status, context, page_str = payload[first_separator + 1 :].rsplit("_", 2)
 
+    booking = await database.get_booking_admin_details(int(booking_id_str)) if status == "cancelled" else None
     await database.update_booking_status(int(booking_id_str), status)
+    if status == "cancelled" and booking:
+        if len(booking) == 13:
+            _booking_id, user_id, name, phone, date, time, _current_status, _duration, service_name, _price, _source, _notes, _created_by_admin = booking
+        else:
+            _booking_id, user_id, name, phone, date, time, _current_status, _duration, service_name, _price, _source, _notes, _created_by_admin, _created_at = booking
+        await _notify_client_about_admin_booking_action(
+            callback.bot,
+            user_id=user_id,
+            title="❌ <b>Ваша запись отменена</b>",
+            lines=[
+                f"<b>Услуга:</b> {escape(service_name or '—')}",
+                f"<b>Дата:</b> {escape(date)}",
+                f"<b>Время:</b> {escape(time)}",
+                "Если нужно, вы можете записаться заново.",
+            ],
+        )
     await callback.answer("Статус обновлен")
     await _show_booking_list(callback, context=context, page=int(page_str))
 booking_actions_callback = booking_actions_callback_v2
@@ -1767,7 +1819,24 @@ async def admin_booking_status_callback_v2(callback: types.CallbackQuery):
         return
     await callback.answer("Статус обновлен")
     _, booking_id_str, status, context, date_token, source_filter, page_str = callback.data.split("|", 6)
+    booking = await database.get_booking_admin_details(int(booking_id_str)) if status == "cancelled" else None
     await database.update_booking_status(int(booking_id_str), status)
+    if status == "cancelled" and booking:
+        if len(booking) == 13:
+            _booking_id, user_id, name, phone, date, time, _current_status, _duration, service_name, _price, _source, _notes, _created_by_admin = booking
+        else:
+            _booking_id, user_id, name, phone, date, time, _current_status, _duration, service_name, _price, _source, _notes, _created_by_admin, _created_at = booking
+        await _notify_client_about_admin_booking_action(
+            callback.bot,
+            user_id=user_id,
+            title="❌ <b>Ваша запись отменена</b>",
+            lines=[
+                f"<b>Услуга:</b> {escape(service_name or '—')}",
+                f"<b>Дата:</b> {escape(date)}",
+                f"<b>Время:</b> {escape(time)}",
+                "Если нужно, вы можете записаться заново.",
+            ],
+        )
     await _show_booking_list(
         callback,
         context=context,
@@ -2160,6 +2229,16 @@ async def admin_booking_reschedule_confirm_callback(callback: types.CallbackQuer
     if not moved:
         await callback.answer("Этот слот уже занят. Выберите другое время.", show_alert=True)
         return
+
+    await _notify_client_about_admin_booking_action(
+        callback.bot,
+        user_id=data.get("booking_user_id"),
+        title="🔁 <b>Вашу запись перенесли</b>",
+        lines=[
+            f"<b>Было:</b> {escape(data['current_date'])} в {escape(data['current_time'])}",
+            f"<b>Стало:</b> {escape(date_value)} в {escape(time_value)}",
+        ],
+    )
 
     await state.clear()
     await callback.message.edit_text(
