@@ -2,6 +2,7 @@ import asyncio
 import logging
 import os
 import re
+from collections import Counter
 from datetime import datetime, timedelta
 from html import escape
 
@@ -79,12 +80,18 @@ def _format_digest_message(
     target_date: str,
     bookings: list[tuple],
 ) -> str:
+    source_counter = Counter((source or "telegram") for *_rest, source, _notes, _created_by_admin in bookings)
     lines = [
         f"📋 <b>{title}</b>",
         f"<b>Дата:</b> {target_date}",
         f"<b>Записей:</b> {len(bookings)}",
         "",
     ]
+
+    if source_counter:
+        summary = " | ".join(f"{_source_label(source)}: {count}" for source, count in sorted(source_counter.items()))
+        lines.append(f"<b>Источники:</b> {summary}")
+        lines.append("")
 
     for index, (name, phone, _date, time, price, service_name, source, notes, created_by_admin) in enumerate(bookings[:7], start=1):
         source_text = _source_label(source)

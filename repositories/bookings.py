@@ -260,7 +260,7 @@ async def create_booking_if_available(
 async def create_manual_booking(
     *,
     name: str,
-    phone: str,
+    phone: str | None,
     date: str,
     time: str,
     duration: int = 60,
@@ -283,6 +283,40 @@ async def create_manual_booking(
         created_by_admin=True,
         enforce_active_limit=False,
     )
+
+
+async def get_client_snapshot_by_phone(phone: str):
+    normalized = _normalize_phone_digits(phone)
+    if not normalized:
+        return None
+
+    async with db_connect() as db:
+        async with db.execute(
+            """
+            SELECT name, phone, date, created_at
+            FROM bookings
+            WHERE phone IS NOT NULL AND TRIM(phone) != ''
+            ORDER BY COALESCE(date_iso, date) DESC, time DESC, id DESC
+            """
+        ) as cursor:
+            rows = await cursor.fetchall()
+
+        matches = [
+            row
+            for row in rows
+            if _normalize_phone_digits(row[1]) == normalized
+        ]
+        if not matches:
+            return None
+
+        latest_name, raw_phone, last_date, created_at = matches[0]
+        return {
+            "name": latest_name,
+            "phone": raw_phone,
+            "last_date": last_date,
+            "created_at": created_at,
+            "total_bookings": len(matches),
+        }
 
 
 async def attach_bookings_to_user_by_phone(phone: str, user_id: int) -> int:
@@ -639,7 +673,8 @@ async def get_booking_admin_details(booking_id: int):
                 price,
                 COALESCE(source, 'telegram'),
                 COALESCE(notes, ''),
-                COALESCE(created_by_admin, 0)
+                COALESCE(created_by_admin, 0),
+                created_at
             FROM bookings
             WHERE id = ?
             """,

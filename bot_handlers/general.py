@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import os
 from collections import Counter
@@ -917,18 +917,18 @@ async def manual_time_callback(callback: types.CallbackQuery, state):
 
     await callback.answer()
     _, _, date_value, time_value = callback.data.split("_", 3)
-    await state.set_state(ManualBookingForm.name)
+    await state.set_state(ManualBookingForm.phone)
     await state.update_data(date=date_value, time=time_value)
     await callback.message.answer(
         (
             "➕ <b>Ручная запись</b>\n\n"
             f"<b>Дата:</b> {escape(date_value)}\n"
             f"<b>Время:</b> {escape(time_value)}\n\n"
-            "Введите имя клиента."
+            "Введите телефон клиента в формате +7 или нажмите «Пропустить»."
         ),
         parse_mode="HTML",
+        reply_markup=_build_manual_phone_keyboard(),
     )
-
 
 @router.message(ManualBookingForm.name)
 async def manual_booking_name_handler(message: types.Message, state):
@@ -937,25 +937,83 @@ async def manual_booking_name_handler(message: types.Message, state):
         await message.answer("Введите имя клиента не короче 2 символов.")
         return
 
-    await state.set_state(ManualBookingForm.phone)
-    await state.update_data(name=name)
-    await message.answer("Введите телефон клиента в формате +7.")
-
-
-@router.message(ManualBookingForm.phone)
-async def manual_booking_phone_handler(message: types.Message, state):
-    phone = normalize_phone(message.text)
-    if not phone:
-        await message.answer("Телефон не похож на корректный номер. Используйте формат +7.")
-        return
-
     await state.set_state(ManualBookingForm.source)
-    await state.update_data(phone=phone)
+    await state.update_data(name=name)
     await message.answer(
         "Выберите источник записи.",
         reply_markup=keyboards.get_manual_booking_source_keyboard(),
     )
 
+@router.message(ManualBookingForm.phone)
+async def manual_booking_phone_handler(message: types.Message, state):
+    phone = normalize_phone(message.text)
+    if not phone:
+        await message.answer("Телефон не похож на корректный номер. Используйте формат +7 или нажмите «Пропустить».")
+        return
+
+    snapshot = await database.get_client_snapshot_by_phone(phone)
+    await state.set_state(ManualBookingForm.name)
+    await state.update_data(phone=phone)
+    if snapshot:
+        await state.update_data(found_name=snapshot["name"])
+        await message.answer(
+            (
+                "👤 <b>Клиент найден</b>\n\n"
+                f"<b>Имя:</b> {escape(snapshot['name'])}\n"
+                f"<b>Последняя запись:</b> {escape(snapshot['last_date'] or '—')}\n"
+                f"<b>Записей всего:</b> {int(snapshot['total_bookings'])}\n\n"
+                "Можно использовать найденное имя или ввести новое."
+            ),
+            parse_mode="HTML",
+            reply_markup=_build_manual_name_keyboard(snapshot["name"]),
+        )
+        return
+
+    await message.answer("Введите имя клиента.")
+
+
+@router.callback_query(F.data == "manual_phone_skip")
+async def manual_phone_skip_callback(callback: types.CallbackQuery, state):
+    admin_id = getenv("ADMIN_ID")
+    if not admin_id or str(callback.from_user.id) != admin_id:
+        return
+
+    await callback.answer()
+    await state.set_state(ManualBookingForm.name)
+    await state.update_data(phone="", found_name=None)
+    await callback.message.answer("Введите имя клиента.")
+
+
+@router.callback_query(F.data == "manual_use_found_name")
+async def manual_use_found_name_callback(callback: types.CallbackQuery, state):
+    admin_id = getenv("ADMIN_ID")
+    if not admin_id or str(callback.from_user.id) != admin_id:
+        return
+
+    await callback.answer()
+    data = await state.get_data()
+    found_name = (data.get("found_name") or "").strip()
+    if len(found_name) < 2:
+        await callback.answer("Не удалось использовать найденное имя.", show_alert=True)
+        return
+
+    await state.set_state(ManualBookingForm.source)
+    await state.update_data(name=found_name)
+    await callback.message.answer(
+        "Выберите источник записи.",
+        reply_markup=keyboards.get_manual_booking_source_keyboard(),
+    )
+
+
+@router.callback_query(F.data == "manual_enter_other_name")
+async def manual_enter_other_name_callback(callback: types.CallbackQuery, state):
+    admin_id = getenv("ADMIN_ID")
+    if not admin_id or str(callback.from_user.id) != admin_id:
+        return
+
+    await callback.answer()
+    await state.set_state(ManualBookingForm.name)
+    await callback.message.answer("Введите имя клиента.")
 
 @router.callback_query(F.data.startswith("manual_source_"))
 async def manual_booking_source_callback(callback: types.CallbackQuery, state):
@@ -999,7 +1057,7 @@ async def _show_manual_booking_confirmation(message: types.Message, state):
         f"<b>Дата:</b> {escape(data['date'])}\n"
         f"<b>Время:</b> {escape(data['time'])}\n"
         f"<b>Клиент:</b> {escape(data['name'])}\n"
-        f"<b>Телефон:</b> {escape(data['phone'])}\n"
+        f"<b>Телефон:</b> {escape(data.get('phone') or '—')}\n"
         f"<b>Источник:</b> {escape(_source_label(data.get('source')))}\n"
         f"<b>Комментарий:</b> {escape(data.get('notes') or '—')}\n"
         f"<b>Стоимость:</b> {escape(format_money(service.get('price_value') or 0))}"
@@ -1032,7 +1090,7 @@ async def manual_booking_confirm_callback(callback: types.CallbackQuery, state):
 
     created = await database.create_manual_booking(
         name=data["name"],
-        phone=data["phone"],
+        phone=(data.get("phone") or None),
         date=data["date"],
         time=data["time"],
         duration=int(service.get("duration") or 60),
@@ -1161,7 +1219,7 @@ async def search_bookings_handler(message: types.Message, state):
         return
     await state.set_state(SearchBookingForm.query)
     await message.answer(
-        "🔎 <b>Поиск записи</b>\n\nВведите имя, телефон, дату или время. Например: <code>777</code> или <code>21.03.2026</code>.",
+        "🔎 <b>Поиск записи</b>\n\nВведите имя, телефон, дату, время, услугу или источник записи. Например: <code>777</code>, <code>WhatsApp</code> или <code>21.03.2026</code>.",
         parse_mode="HTML",
     )
 
@@ -1217,7 +1275,11 @@ async def booking_actions_callback_v2(callback: types.CallbackQuery):
         await callback.answer("Запись не найдена", show_alert=True)
         return
 
-    booking_id, user_id, name, phone, date, time, status, duration, service_name, price, source, notes, created_by_admin = booking
+    if len(booking) == 13:
+        booking_id, user_id, name, phone, date, time, status, duration, service_name, price, source, notes, created_by_admin = booking
+        created_at = None
+    else:
+        booking_id, user_id, name, phone, date, time, status, duration, service_name, price, source, notes, created_by_admin, created_at = booking
     text = (
         "📝 <b>Карточка записи</b>\n\n"
         f"<b>Клиент:</b> {escape(name)}\n"
@@ -1229,6 +1291,7 @@ async def booking_actions_callback_v2(callback: types.CallbackQuery):
         f"<b>Сумма:</b> {escape(format_money(price))}\n"
         f"<b>Источник:</b> {escape(_source_label(source))}\n"
         f"<b>Создана админом:</b> {'Да' if int(created_by_admin or 0) else 'Нет'}\n"
+        f"<b>Создана:</b> {escape(_format_iso_to_date(created_at))}\n"
         f"<b>Статус:</b> {escape(_status_label(status))}\n"
         f"<b>Комментарий:</b> {escape(notes or '—')}"
     )
@@ -1496,6 +1559,25 @@ def _build_edit_source_markup(booking_id: int, *, context: str, page: int, sourc
     return builder.as_markup()
 
 
+def _build_manual_phone_keyboard():
+    from aiogram.utils.keyboard import InlineKeyboardBuilder
+
+    builder = InlineKeyboardBuilder()
+    builder.row(types.InlineKeyboardButton(text="Пропустить", callback_data="manual_phone_skip"))
+    builder.row(types.InlineKeyboardButton(text="❌ Отмена", callback_data="cancel_admin_action"))
+    return builder.as_markup()
+
+
+def _build_manual_name_keyboard(found_name: str):
+    from aiogram.utils.keyboard import InlineKeyboardBuilder
+
+    builder = InlineKeyboardBuilder()
+    builder.row(types.InlineKeyboardButton(text=f"Использовать: {found_name}", callback_data="manual_use_found_name"))
+    builder.row(types.InlineKeyboardButton(text="Ввести другое имя", callback_data="manual_enter_other_name"))
+    builder.row(types.InlineKeyboardButton(text="❌ Отмена", callback_data="cancel_admin_action"))
+    return builder.as_markup()
+
+
 async def _show_booking_card(message_or_callback, booking_id: int, *, context: str, page: int, source_filter: str = "all", date_value: str | None = None):
     booking = await database.get_booking_admin_details(int(booking_id))
     if not booking:
@@ -1505,7 +1587,11 @@ async def _show_booking_card(message_or_callback, booking_id: int, *, context: s
             await message_or_callback.answer("Запись не найдена.")
         return
 
-    booking_id, user_id, name, phone, date, time, status, duration, service_name, price, source, notes, created_by_admin = booking
+    if len(booking) == 13:
+        booking_id, user_id, name, phone, date, time, status, duration, service_name, price, source, notes, created_by_admin = booking
+        created_at = None
+    else:
+        booking_id, user_id, name, phone, date, time, status, duration, service_name, price, source, notes, created_by_admin, created_at = booking
     text = (
         "📝 <b>Карточка записи</b>\n\n"
         f"<b>Клиент:</b> {escape(name)}\n"
@@ -1517,6 +1603,7 @@ async def _show_booking_card(message_or_callback, booking_id: int, *, context: s
         f"<b>Сумма:</b> {escape(format_money(price))}\n"
         f"<b>Источник:</b> {escape(_source_label(source))}\n"
         f"<b>Создана админом:</b> {'Да' if int(created_by_admin or 0) else 'Нет'}\n"
+        f"<b>Создана:</b> {escape(_format_iso_to_date(created_at))}\n"
         f"<b>Статус:</b> {escape(_status_label(status))}\n"
         f"<b>Комментарий:</b> {escape(notes or '—')}"
     )
@@ -2115,3 +2202,5 @@ async def admin_booking_reschedule_cancel_callback(callback: types.CallbackQuery
         "❌ <b>Перенос отменен</b>\n\nЕсли нужно, можно открыть перенос заново из карточки записи.",
         parse_mode="HTML",
     )
+
+
