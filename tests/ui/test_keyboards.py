@@ -60,7 +60,7 @@ class KeyboardTests(unittest.TestCase):
         self.assertEqual(first_row[0].callback_data, "cancel_7_15")
         self.assertEqual(first_row[1].callback_data, "resched_7_15")
 
-    def test_admin_booking_actions_prefers_telegram_link_when_user_id_exists(self):
+    def test_admin_booking_actions_use_whatsapp_link_when_phone_exists(self):
         markup = common_keyboards.get_admin_booking_actions_keyboard(
             10,
             "+7 (777) 123-45-67",
@@ -70,7 +70,7 @@ class KeyboardTests(unittest.TestCase):
         )
 
         first_row = markup.inline_keyboard[0]
-        self.assertEqual(first_row[0].url, "tg://user?id=123456789")
+        self.assertEqual(first_row[0].url, "https://wa.me/77771234567")
         self.assertEqual(first_row[1].callback_data, "show_phone_77771234567")
 
     def test_admin_booking_actions_include_no_show_for_scheduled(self):

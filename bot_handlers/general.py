@@ -1611,9 +1611,7 @@ def _build_booking_actions_markup(
     date_token = date_value or "-"
 
     contact_buttons = []
-    if telegram_user_id:
-        contact_buttons.append(types.InlineKeyboardButton(text="💬 Написать", url=f"tg://user?id={telegram_user_id}"))
-    elif digits:
+    if digits:
         contact_buttons.append(types.InlineKeyboardButton(text="💬 Написать", url=f"https://wa.me/{digits}"))
     if digits:
         contact_buttons.append(types.InlineKeyboardButton(text="📞 Показать номер", callback_data=f"show_phone_{digits}"))

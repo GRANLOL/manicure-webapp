@@ -292,9 +292,7 @@ def get_admin_booking_actions_keyboard(
     digits = _normalize_phone(phone)
 
     contact_buttons = []
-    if telegram_user_id:
-        contact_buttons.append(InlineKeyboardButton(text="💬 Написать", url=f"tg://user?id={telegram_user_id}"))
-    elif digits:
+    if digits:
         contact_buttons.append(InlineKeyboardButton(text="💬 Написать", url=f"https://wa.me/{digits}"))
 
     if digits:
